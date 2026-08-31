@@ -1,0 +1,36 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Node modules (but NOT dist/ — we ship the built frontend)
+frontend/node_modules/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Data files
+backend/data/*.db
+backend/data/repos/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.pid
+*.sqlite3
+build/
+*.egg
+.oxlintrc.json
