@@ -1,4 +1,4 @@
-# auto-changelog
+# Release Notes
 
 Automatically generate beautiful, AI-powered changelogs for your GitHub repositories. Supports multiple LLM providers and notification channels.
 
@@ -188,4 +188,3 @@ auto-changelog/
 ## License
 
 MIT
-5. For auto-generation on new tags, set up a webhook (see below)
