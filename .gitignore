@@ -34,3 +34,9 @@ Thumbs.db
 build/
 *.egg
 .oxlintrc.json
+
+# ── Secrets — never commit ──
+# GitHub App private keys
+*.pem
+*private-key*
+auto-release-notes.*

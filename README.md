@@ -115,6 +115,7 @@ The webhook fires on new tag creation, automatically queuing changelog generatio
 | `JWT_EXPIRE_MINUTES` | No | Token expiry (default: 1440 = 24h) |
 | `ENCRYPTION_KEY` | No | Fernet key for API key encryption at rest |
 | `CORS_ORIGINS` | No | Comma-separated allowed origins |
+| `WEBHOOK_BASE_URL` | No | Public URL for GitHub webhook callbacks (e.g. `http://YOUR_IP:8003`) |
 
 ## API Endpoints
 

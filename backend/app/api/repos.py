@@ -16,6 +16,9 @@ from app.schemas.repo import (
 from app.services.github import GitHubClient
 from app.config import settings
 
+import logging
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/repos", tags=["repos"])
 
 
@@ -202,6 +205,19 @@ async def import_selected_repos(
         )
         db.add(repo)
         imported.append(repo)
+
+        # Create webhook on GitHub (best-effort)
+        if settings.webhook_base_url and settings.github_webhook_secret:
+            try:
+                webhook_url = f"{settings.webhook_base_url}/api/webhook"
+                await gh.create_webhook(
+                    gh_token, full_name,
+                    webhook_url=webhook_url,
+                    webhook_secret=settings.github_webhook_secret,
+                )
+                logger.info("Webhook created for %s", full_name)
+            except Exception:
+                logger.warning("Could not create webhook for %s", full_name, exc_info=True)
 
     await db.flush()
     return RepoListResponse(repos=[

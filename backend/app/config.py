@@ -57,6 +57,7 @@ class Settings:
     # Webhook server
     webhook_port: int = int(os.getenv("WEBHOOK_PORT", "9876"))
     webhook_path: str = os.getenv("WEBHOOK_PATH", "/webhook")
+    webhook_base_url: Optional[str] = os.getenv("WEBHOOK_BASE_URL")
 
 
 settings = Settings()
