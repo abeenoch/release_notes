@@ -28,6 +28,9 @@ class Repository(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_private: Mapped[bool] = mapped_column(Boolean, default=False)
     last_cloned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Incremental changelog tracking: the HEAD commit covered by the last
+    # generated changelog. Next push generates from this commit onward.
+    last_generated_commit: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

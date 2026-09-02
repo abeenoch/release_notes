@@ -90,6 +90,14 @@ class GitClient:
                 return "HEAD (unreleased)"
         return ref
 
+    def get_head_sha(self) -> str:
+        """Get the full SHA of the current HEAD commit."""
+        return self.repo.head.commit.hexsha
+
+    def get_root_sha(self) -> str:
+        """Get the SHA of the first (root) commit on the current branch."""
+        return self.repo.git.rev_list("--max-parents=0", "HEAD").split("\n")[0].strip()
+
     def get_repo_url(self) -> str:
         """Get the current repository URL (origin remote)."""
         try:

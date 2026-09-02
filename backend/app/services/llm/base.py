@@ -33,9 +33,10 @@ Rules:
 3. If the diff contains breaking changes, add a "BREAKING CHANGES" section at the top
 4. Keep descriptions concise (one line per change when possible)
 5. Output ONLY valid markdown — no extra commentary
+6. The user prompt tells you the EXACT version identifier to use. Use it verbatim in the heading — NEVER invent a version number like v1.0.0
 
 Format:
-# Changelog — v{new_version}
+# Changelog — {the exact version identifier given in the user prompt}
 
 ## Summary
 {1-2 sentence high-level summary of this release}
@@ -58,10 +59,14 @@ def changelog_user_prompt(
     to_tag: str,
     diff_summary: str,
     diff_patch: str | None = None,
+    version: str | None = None,
 ) -> str:
     """Build the user prompt from diff data."""
+    version_id = version or to_tag
     prompt = (
         f"Generate a changelog for the changes between {from_tag} and {to_tag}.\n\n"
+        f"IMPORTANT: The version identifier for this changelog is exactly: {version_id}\n"
+        f"Use it verbatim in the heading: '# Changelog — {version_id}'. Do NOT invent a version number.\n\n"
         f"## Commit Summary (messages)\n"
         f"{diff_summary}\n"
     )

@@ -34,13 +34,20 @@ _CHANGELOG_ADDITIONS: dict[str, str] = {
     "notification_status": "VARCHAR(20)",
 }
 
+_REPO_ADDITIONS: dict[str, str] = {
+    "last_generated_commit": "VARCHAR(40)",
+}
+
 
 async def _ensure_sqlite_columns() -> None:
     """Idempotently add newly-introduced columns to existing SQLite tables."""
     if not settings.database_url.startswith("sqlite"):
         return  # Postgres → use Alembic migrations instead
     async with engine.begin() as conn:
-        for table, columns in (("changelogs", _CHANGELOG_ADDITIONS),):
+        for table, columns in (
+            ("changelogs", _CHANGELOG_ADDITIONS),
+            ("repositories", _REPO_ADDITIONS),
+        ):
             try:
                 result = await conn.execute(text(f"PRAGMA table_info({table})"))
                 existing = {row[1] for row in result.fetchall()}
