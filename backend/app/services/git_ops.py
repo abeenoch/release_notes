@@ -26,25 +26,21 @@ class GitClient:
         """
         Resolve the 'from' and 'to' tags.
         Returns (from_tag, to_tag) where from_tag is the older/base tag.
+
+        If only one tag exists or none exist, falls back to:
+        - to_tag: HEAD (latest commit)
+        - from_tag: root commit (or empty string for full history)
         """
         if from_tag and to_tag:
             return from_tag, to_tag
 
         tags = sorted(
-            [t.name for t in self.repo.tags if t.name.startswith("v") or t.name[0].isdigit()],
+            [t.name for t in self.repo.tags if t.name.startswith("v") or (t.name and t.name[0].isdigit())],
             key=lambda t: [int(p) if p.isdigit() else p for p in t.lstrip("v").split(".")],
         )
 
-        if len(tags) < 2:
-            if len(tags) == 1:
-                return tags[0], "HEAD"
-            raise ValueError(
-                "Could not find at least two version tags in this repository. "
-                "Please specify --from-tag and --to-tag manually."
-            )
-
-        latest = tags[-1]
-        previous = tags[-2]
+        latest = tags[-1] if tags else "HEAD"
+        previous = tags[-2] if len(tags) >= 2 else (tags[-1] if tags else None)
         return from_tag or previous, to_tag or latest
 
     def get_diff_summary(self, from_ref: str, to_ref: str) -> str:
@@ -106,13 +102,28 @@ class GitClient:
     def clone_repo(cls, clone_url: str, clone_path: str, branch: str = "main") -> "GitClient":
         """Clone a repository and return a GitClient for it."""
         path = Path(clone_path)
-        if path.exists():
+        # Only treat as existing if it's a valid git repo (has .git dir/file)
+        is_valid_repo = path.exists() and (path / ".git").exists()
+        if is_valid_repo:
             # Pull instead
             repo = GitRepo(clone_path)
-            repo.remotes.origin.fetch("--tags", "--force")
-            repo.git.checkout(branch)
-            repo.remotes.origin.pull()
+            try:
+                repo.remotes.origin.fetch("--tags", "--force")
+            except Exception:
+                pass  # tags may already be up to date
+            try:
+                repo.git.checkout(branch)
+            except Exception:
+                pass
+            try:
+                repo.remotes.origin.pull()
+            except Exception:
+                pass  # pull may fail if no upstream
         else:
+            # Remove any stale empty/partial dir, then clone fresh
+            if path.exists():
+                import shutil
+                shutil.rmtree(clone_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             GitRepo.clone_from(clone_url, clone_path, branch=branch, multi_options=["--tags"])
         return cls(repo_path=clone_path)

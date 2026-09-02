@@ -80,7 +80,7 @@ Configured through the UI at **LLM Config** tab. Add one or more providers:
 | Commit-based (free) | — | No |
 | OpenAI | gpt-4o | Yes |
 | Anthropic | claude-sonnet-4-20250514 | Yes |
-| Groq | mixtral-8x7b-32768 | Yes |
+| Groq | openai/gpt-oss-120b | Yes |
 | OpenRouter | anthropic/claude-3.5-sonnet | Yes |
 | Ollama | llama3.3 (localhost:11434) | No |
 

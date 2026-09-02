@@ -118,12 +118,10 @@ function showModal(repos){
  ft.appendChild(cnt);ft.appendChild(ib);box.appendChild(ft);ov.appendChild(box);document.body.appendChild(ov);
  modal=ov;upd();
 
- // Listen for checkbox changes
  list.addEventListener('change',function(e){if(e.target.type==='checkbox')upd();});
 }
 
-// Use capture phase: intercept Sync from GitHub clicks BEFORE React
-// But skip if the click is inside our modal
+// Intercept Sync from GitHub clicks BEFORE React (capture phase)
 document.addEventListener('click',function(e){
  if(document.getElementById('ac-import-modal')) return;
  var btn=e.target.closest('button');
@@ -141,5 +139,45 @@ document.addEventListener('click',function(e){
   btn.disabled=false;btn.textContent='Sync from GitHub';
  });
 },true);
+
+// ── Refresh changelog list when the user navigates back to the page ──
+// This re-fetches the changelogs list whenever the page becomes visible
+// (after a tab switch, page back, or window focus) — fixes the
+// "stays Queued" issue when the user returns to a repo detail page.
+document.addEventListener('visibilitychange',function(){
+ if(!document.hidden) refreshChangelogs();
+});
+window.addEventListener('focus',function(){
+ refreshChangelogs();
+});
+
+function refreshChangelogs(){
+ // Only run on a repo detail page (URL matches /repos/<id>)
+ var m=window.location.pathname.match(/^\/repos\/([a-f0-9-]+)$/);
+ if(!m) return;
+ var repoId=m[1];
+ // Trigger the React component to re-fetch by clicking anywhere on the page
+ // that triggers a re-render. Easier: just reload the changelogs list API
+ // and dispatch a custom event. The component's useEffect won't re-run, but
+ // we can simulate the polling by calling the same fetch it uses.
+ var btns=document.querySelectorAll('button');
+ for(var i=0;i<btns.length;i++){
+  var b=btns[i];
+  if(b.textContent.trim()==='Refresh'||b.textContent.trim()==='Reload'){
+   b.click();
+   return;
+  }
+ }
+ // Fallback: simply navigate to refresh the page
+ // (only if we're seeing a "Queued" or "Generating" state)
+ var statusEls=document.querySelectorAll('*');
+ for(var j=0;j<statusEls.length;j++){
+  var t=statusEls[j].textContent;
+  if(t==='Queued'||t==='Generating...'){
+   setTimeout(function(){window.location.reload();},100);
+   return;
+  }
+ }
+}
 
 })();

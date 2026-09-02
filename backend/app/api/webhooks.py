@@ -68,6 +68,10 @@ async def _queue_changelog_for_tag(
     db.add(changelog)
     await db.flush()
     await db.refresh(changelog)
+    # Commit explicitly so the background task (which uses its own session)
+    # can see this changelog record.
+    await db.commit()
+    await db.refresh(changelog)
 
     background_tasks.add_task(run_changelog_generation, changelog.id)
 

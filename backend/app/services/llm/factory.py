@@ -37,7 +37,7 @@ def create_llm_provider(
     elif provider == "groq":
         return GroqProvider(
             api_key=api_key or "",
-            model=model or "mixtral-8x7b-32768",
+            model=model or "openai/gpt-oss-120b",
         )
     elif provider == "openrouter":
         return OpenRouterProvider(
