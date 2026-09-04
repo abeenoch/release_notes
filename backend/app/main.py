@@ -64,6 +64,12 @@ if _frontend_dist.exists():
         # Fallback to React app if no landing page
         return FileResponse(str(_frontend_dist / "index.html"))
 
+    @app.get("/login")
+    async def redirect_login():
+        """Redirect old /login route to root (cinematic page owns auth)."""
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/")
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """SPA fallback: serve index.html for all non-API, non-landing routes."""

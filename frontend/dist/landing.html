@@ -6,7 +6,6 @@
   <title>Release Notes — Forge clarity from every commit</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
-    /* ── Reset & Base ─────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #09090b;
@@ -32,8 +31,6 @@
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
-
-    /* ── Ambient Background ───────────────────────────────── */
     .ambient {
       position: fixed; inset: 0; z-index: 0; pointer-events: none;
       background:
@@ -41,8 +38,6 @@
         radial-gradient(ellipse 60% 50% at 80% 110%, rgba(245,158,11,0.05), transparent 50%);
     }
     #ember-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-
-    /* ── Navigation ───────────────────────────────────────── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 50;
       display: flex; align-items: center; justify-content: space-between;
@@ -51,10 +46,7 @@
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--surface-border);
     }
-    .nav-logo {
-      display: flex; align-items: center; gap: 0.6rem;
-      font-weight: 600; font-size: 1.05rem; letter-spacing: -0.02em;
-    }
+    .nav-logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 1.05rem; letter-spacing: -0.02em; }
     .nav-logo .icon {
       width: 28px; height: 28px; border-radius: 7px;
       background: linear-gradient(135deg, var(--accent), #d97706);
@@ -62,12 +54,6 @@
       box-shadow: 0 0 20px var(--accent-glow);
     }
     .nav-logo .icon svg { width: 16px; height: 16px; color: #000; }
-    .nav-links { display: flex; align-items: center; gap: 2rem; }
-    .nav-links a {
-      color: var(--text-dim); text-decoration: none; font-size: 0.875rem;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover { color: var(--text); }
     .nav-cta {
       padding: 0.5rem 1.25rem; border-radius: 8px;
       background: var(--accent); color: #000; font-weight: 600;
@@ -76,8 +62,6 @@
       transition: box-shadow 0.3s, transform 0.2s;
     }
     .nav-cta:hover { box-shadow: 0 0 36px var(--accent-glow); transform: translateY(-1px); }
-
-    /* ── Hero ─────────────────────────────────────────────── */
     .hero {
       position: relative; z-index: 1;
       min-height: 100vh; display: flex; flex-direction: column;
@@ -121,24 +105,18 @@
       box-shadow: 0 0 40px var(--accent-glow), 0 4px 24px rgba(0,0,0,0.4);
       transition: box-shadow 0.3s, transform 0.2s;
       opacity: 0; animation: fadeUp 0.8s ease 0.8s forwards;
+      cursor: pointer; border: none;
     }
-    .hero-cta:hover {
-      box-shadow: 0 0 60px var(--accent-glow), 0 6px 32px rgba(0,0,0,0.5);
-      transform: translateY(-2px);
-    }
+    .hero-cta:hover { box-shadow: 0 0 60px var(--accent-glow), 0 6px 32px rgba(0,0,0,0.5); transform: translateY(-2px); }
     .hero-cta svg { transition: transform 0.3s; }
     .hero-cta:hover svg { transform: translateX(4px); }
-
-    /* ── Forge Animation ──────────────────────────────────── */
+    .hero-cta:disabled { opacity: 0.6; cursor: wait; }
     .forge-stage {
       position: relative; z-index: 1; width: 100%; max-width: 720px;
       margin: 3rem auto 0; height: 320px;
       opacity: 0; animation: fadeUp 1s ease 1s forwards;
     }
-    .forge-inputs {
-      position: absolute; top: 0; left: 0; right: 0;
-      display: flex; flex-direction: column; gap: 0.5rem;
-    }
+    .forge-inputs { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 0.5rem; }
     .forge-input {
       font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
       padding: 0.5rem 0.85rem; border-radius: var(--radius-sm);
@@ -153,7 +131,6 @@
     .forge-input:nth-child(3) { animation: forgeIn 0.5s ease 1.8s forwards, forgeHammer 0.4s ease 2.8s forwards; }
     .forge-input:nth-child(4) { animation: forgeIn 0.5s ease 2.0s forwards, forgeHammer 0.4s ease 3.0s forwards; }
     .forge-input:nth-child(5) { animation: forgeIn 0.5s ease 2.2s forwards, forgeHammer 0.4s ease 3.2s forwards; }
-
     .forge-output {
       position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
       width: 100%; max-width: 480px;
@@ -162,43 +139,23 @@
       box-shadow: 0 0 60px var(--accent-glow), 0 8px 40px rgba(0,0,0,0.5);
       opacity: 0; animation: forgeReveal 0.6s ease 3.6s forwards;
     }
-    .forge-output h3 {
-      font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem;
-      color: var(--accent);
-    }
+    .forge-output h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--accent); }
     .forge-output ul { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
-    .forge-output li {
-      font-size: 0.82rem; color: var(--text-dim); padding-left: 1.2rem; position: relative;
-    }
-    .forge-output li::before {
-      content: '▸'; position: absolute; left: 0; color: var(--accent);
-    }
-
-    /* ── Features ─────────────────────────────────────────── */
+    .forge-output li { font-size: 0.82rem; color: var(--text-dim); padding-left: 1.2rem; position: relative; }
+    .forge-output li::before { content: '\25B8'; position: absolute; left: 0; color: var(--accent); }
     .features {
-      position: relative; z-index: 1;
-      max-width: 1100px; margin: 0 auto; padding: 6rem 2rem;
+      position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 6rem 2rem;
     }
     .features-header { text-align: center; margin-bottom: 3.5rem; }
-    .features-header h2 {
-      font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 700;
-      letter-spacing: -0.03em; margin-bottom: 0.75rem;
-    }
+    .features-header h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.75rem; }
     .features-header p { color: var(--text-dim); font-size: 1.05rem; }
-    .feature-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.25rem;
-    }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; }
     .feature-card {
       background: var(--surface); border: 1px solid var(--surface-border);
       border-radius: var(--radius); padding: 1.75rem;
       transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
     }
-    .feature-card:hover {
-      border-color: rgba(245,158,11,0.3);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 40px rgba(245,158,11,0.08);
-    }
+    .feature-card:hover { border-color: rgba(245,158,11,0.3); transform: translateY(-4px); box-shadow: 0 8px 40px rgba(245,158,11,0.08); }
     .feature-icon {
       width: 44px; height: 44px; border-radius: 11px;
       background: var(--accent-soft); border: 1px solid rgba(245,158,11,0.2);
@@ -207,28 +164,18 @@
     .feature-icon svg { width: 20px; height: 20px; color: var(--accent); }
     .feature-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.5rem; }
     .feature-card p { font-size: 0.9rem; color: var(--text-dim); line-height: 1.55; }
-
-    /* ── Pipeline ─────────────────────────────────────────── */
     .pipeline {
-      position: relative; z-index: 1; max-width: 900px;
-      margin: 0 auto; padding: 4rem 2rem 6rem;
+      position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 4rem 2rem 6rem;
     }
     .pipeline-header { text-align: center; margin-bottom: 3rem; }
-    .pipeline-header h2 {
-      font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 700;
-      letter-spacing: -0.03em; margin-bottom: 0.75rem;
-    }
+    .pipeline-header h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.75rem; }
     .pipeline-header p { color: var(--text-dim); font-size: 1.05rem; }
-    .pipeline-steps {
-      display: flex; flex-direction: column; gap: 0; position: relative;
-    }
+    .pipeline-steps { display: flex; flex-direction: column; gap: 0; position: relative; }
     .pipeline-steps::before {
       content: ''; position: absolute; left: 22px; top: 0; bottom: 0; width: 2px;
       background: linear-gradient(to bottom, var(--accent), transparent);
     }
-    .step {
-      display: flex; gap: 1.5rem; align-items: flex-start; padding: 1.25rem 0;
-    }
+    .step { display: flex; gap: 1.5rem; align-items: flex-start; padding: 1.25rem 0; }
     .step-num {
       width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
       background: var(--bg-soft); border: 2px solid var(--accent);
@@ -237,46 +184,30 @@
     }
     .step-content h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; }
     .step-content p { font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; }
-
-    /* ── Footer ───────────────────────────────────────────── */
     .footer {
       position: relative; z-index: 1; text-align: center;
       padding: 3rem 2rem; border-top: 1px solid var(--surface-border);
       color: var(--text-muted); font-size: 0.85rem;
     }
-
-    /* ── Animations ───────────────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.5; transform: scale(0.8); }
-    }
-    @keyframes forgeIn {
-      to { opacity: 1; transform: translateX(0); }
-    }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.8); } }
+    @keyframes forgeIn { to { opacity:1; transform:translateX(0); } }
     @keyframes forgeHammer {
-      0%   { background: var(--surface); border-color: var(--surface-border); }
-      40%  { background: var(--accent-soft); border-color: var(--accent); transform: scale(1.04); }
-      100% { opacity: 0; transform: scale(0.9) translateY(20px); }
+      0% { background:var(--surface); border-color:var(--surface-border); }
+      40% { background:var(--accent-soft); border-color:var(--accent); transform:scale(1.04); }
+      100% { opacity:0; transform:scale(0.9) translateY(20px); }
     }
     @keyframes forgeReveal {
-      from { opacity: 0; transform: translateX(-50%) scale(0.92) translateY(20px); }
-      to   { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+      from { opacity:0; transform:translateX(-50%) scale(0.92) translateY(20px); }
+      to { opacity:1; transform:translateX(-50%) scale(1) translateY(0); }
     }
     @keyframes ember {
-      0%   { transform: translateY(100vh) scale(0); opacity: 0; }
-      10%  { opacity: 1; }
-      90%  { opacity: 0.6; }
-      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+      0% { transform:translateY(100vh) scale(0); opacity:0; }
+      10% { opacity:1; } 90% { opacity:0.6; }
+      100% { transform:translateY(-10vh) scale(1); opacity:0; }
     }
-
-    /* ── Responsive ───────────────────────────────────────── */
     @media (max-width: 640px) {
       nav { padding: 1rem 1.25rem; }
-      .nav-links { display: none; }
       .forge-stage { height: 280px; }
       .hero { padding: 5rem 1.25rem 3rem; }
     }
@@ -286,32 +217,22 @@
   <div class="ambient"></div>
   <canvas id="ember-canvas"></canvas>
 
-  <!-- Nav -->
   <nav>
     <div class="nav-logo">
-      <div class="icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      </div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
       <span>Release Notes</span>
     </div>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#pipeline">How it works</a>
-      <a href="/login" class="nav-cta">Open App</a>
-    </div>
+    <a href="#features" class="nav-cta" id="nav-cta">Get Started</a>
   </nav>
 
-  <!-- Hero -->
   <section class="hero">
     <div class="hero-badge"><span class="dot"></span> AI-powered changelogs</div>
     <h1>Forge clarity from <span class="accent">every commit</span></h1>
     <p>Stop hand-writing release notes. Connect your repos, and let AI transform raw commits into beautiful, structured changelogs — delivered automatically on every push.</p>
-    <a href="/login" class="hero-cta">
+    <button class="hero-cta" id="cta-btn" onclick="startOAuth()">
       Light the Forge
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-    </a>
-
-    <!-- Forge Animation -->
+    </button>
     <div class="forge-stage">
       <div class="forge-inputs">
         <div class="forge-input">fix: resolve auth redirect loop on callback</div>
@@ -332,135 +253,125 @@
     </div>
   </section>
 
-  <!-- Features -->
   <section class="features" id="features">
-    <div class="features-header">
-      <h2>Everything you need</h2>
-      <p>From commit to changelog to inbox — fully automated.</p>
-    </div>
+    <div class="features-header"><h2>Everything you need</h2><p>From commit to changelog to inbox — fully automated.</p></div>
     <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.24 7.76 2.83-2.83"/><path d="M18 12h4"/><path d="m16.24 16.24 2.83 2.83"/><path d="M12 18v4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M2 12h4"/><path d="m4.93 4.93 2.83 2.83"/></svg></div>
-        <h3>Multiple AI providers</h3>
-        <p>OpenAI, Anthropic, Groq, OpenRouter, Ollama — or use the free commit-based parser. Your choice, your keys.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></div>
-        <h3>GitHub integration</h3>
-        <p>OAuth login, one-click repo sync, and auto-created webhooks. Push a commit — get a changelog.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-        <h3>Auto notifications</h3>
-        <p>Deliver changelogs via SMTP email, SendGrid, or Slack webhooks the moment they're generated.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div>
-        <h3>Incremental &amp; smart</h3>
-        <p>Each changelog covers only new commits since the last one. No duplicates, no noise.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h6"/></svg></div>
-        <h3>Selective repos</h3>
-        <p>Pick exactly which repos get changelogs. The rest stay synced but inactive — your call.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg></div>
-        <h3>Encrypted keys</h3>
-        <p>Your API keys and tokens are encrypted at rest with Fernet. We never store them in plain text.</p>
-      </div>
+      <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.24 7.76 2.83-2.83"/><path d="M18 12h4"/><path d="m16.24 16.24 2.83 2.83"/><path d="M12 18v4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M2 12h4"/><path d="m4.93 4.93 2.83 2.83"/></svg></div><h3>Multiple AI providers</h3><p>OpenAI, Anthropic, Groq, OpenRouter, Ollama — or use the free commit-based parser. Your choice, your keys.</p></div>
+      <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></div><h3>GitHub integration</h3><p>OAuth login, one-click repo sync, and auto-created webhooks. Push a commit — get a changelog.</p></div>
+      <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><h3>Auto notifications</h3><p>Deliver changelogs via SMTP email, SendGrid, or Slack webhooks the moment they're generated.</p></div>
+      <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div><h3>Incremental &amp; smart</h3><p>Each changelog covers only new commits since the last one. No duplicates, no noise.</p></div>
+      <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h6"/></svg></div><h3>Selective repos</h3><p>Pick exactly which repos get changelogs. The rest stay synced but inactive — your call.</p></div>
+      <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg></div><h3>Encrypted keys</h3><p>Your API keys and tokens are encrypted at rest with Fernet. We never store them in plain text.</p></div>
     </div>
   </section>
 
-  <!-- Pipeline -->
   <section class="pipeline" id="pipeline">
-    <div class="pipeline-header">
-      <h2>How it works</h2>
-      <p>Three steps from push to polished changelog.</p>
-    </div>
+    <div class="pipeline-header"><h2>How it works</h2><p>Three steps from push to polished changelog.</p></div>
     <div class="pipeline-steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <h3>Connect &amp; select</h3>
-          <p>Sign in with GitHub, sync your repos, and pick which ones you want changelogs for.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <h3>Push your code</h3>
-          <p>GitHub fires a webhook on every push. We receive it and queue a changelog — automatically.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <h3>Get your changelog</h3>
-          <p>AI transforms your commits into a structured changelog. View it in the dashboard or get it emailed.</p>
-        </div>
-      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h3>Connect &amp; select</h3><p>Sign in with GitHub, sync your repos, and pick which ones you want changelogs for.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h3>Push your code</h3><p>GitHub fires a webhook on every push. We receive it and queue a changelog — automatically.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h3>Get your changelog</h3><p>AI transforms your commits into a structured changelog. View it in the dashboard or get it emailed.</p></div></div>
     </div>
   </section>
 
-  <!-- Footer -->
-  <div class="footer">
-    <p>Release Notes — Auto-generated changelogs for every release.</p>
-  </div>
+  <div class="footer"><p>Release Notes — Auto-generated changelogs for every release.</p></div>
 
-  <!-- Ember particles -->
   <script>
-    (function() {
-      const canvas = document.getElementById('ember-canvas');
-      const ctx = canvas.getContext('2d');
-      let W, H, embers = [];
+    // ── Config ──────────────────────────────────────────────
+    var CLIENT_ID = 'Ov23ligbTLjZzb1vZuMr';
+    var REDIRECT_URI = window.location.origin + '/';
+    var SCOPES = 'repo,user:email';
 
-      function resize() {
-        W = canvas.width = window.innerWidth;
-        H = canvas.height = window.innerHeight;
+    // ── Auth state ──────────────────────────────────────────
+    function getToken() { return localStorage.getItem('arn_token'); }
+    function hasToken() { return !!getToken(); }
+
+    // ── OAuth flow ──────────────────────────────────────────
+    function startOAuth() {
+      var url = 'https://github.com/login/oauth/authorize'
+        + '?client_id=' + encodeURIComponent(CLIENT_ID)
+        + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
+        + '&scope=' + encodeURIComponent(SCOPES);
+      window.location.href = url;
+    }
+
+    async function exchangeCode(code) {
+      var res = await fetch('/api/auth/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code })
+      });
+      if (!res.ok) {
+        var data = await res.json().catch(function() { return {}; });
+        throw new Error(data.detail || 'Authentication failed');
       }
-      window.addEventListener('resize', resize);
-      resize();
+      var data = await res.json();
+      localStorage.setItem('arn_token', data.access_token);
+    }
 
+    // ── Init ────────────────────────────────────────────────
+    (async function() {
+      var params = new URLSearchParams(window.location.search);
+      var code = params.get('code');
+
+      // 1) Just returned from GitHub OAuth → exchange code
+      if (code) {
+        try {
+          await exchangeCode(code);
+          // Clean URL and go to dashboard
+          window.history.replaceState({}, '', '/');
+          window.location.replace('/repos');
+          return;
+        } catch (err) {
+          alert('Sign-in failed: ' + err.message);
+          window.history.replaceState({}, '', '/');
+        }
+      }
+
+      // 2) Already authenticated → go to dashboard
+      if (hasToken()) {
+        window.location.replace('/repos');
+        return;
+      }
+
+      // 3) Not authenticated → show cinematic experience
+      // (page content is already visible; init ember particles)
+      initEmbers();
+    })();
+
+    // ── Ember particles ─────────────────────────────────────
+    function initEmbers() {
+      var canvas = document.getElementById('ember-canvas');
+      var ctx = canvas.getContext('2d');
+      var W, H, embers = [];
+      function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+      window.addEventListener('resize', resize); resize();
       function spawn() {
         if (embers.length > 50) return;
         embers.push({
-          x: Math.random() * W,
-          y: H + 10,
-          vx: (Math.random() - 0.5) * 0.4,
-          vy: -(0.4 + Math.random() * 0.8),
-          r: 1 + Math.random() * 2,
-          life: 0,
-          maxLife: 200 + Math.random() * 200,
-          alpha: 0.4 + Math.random() * 0.4
+          x: Math.random()*W, y: H+10,
+          vx: (Math.random()-0.5)*0.4, vy: -(0.4+Math.random()*0.8),
+          r: 1+Math.random()*2, life: 0, maxLife: 200+Math.random()*200,
+          alpha: 0.4+Math.random()*0.4
         });
       }
-
       function tick() {
-        ctx.clearRect(0, 0, W, H);
-        if (Math.random() < 0.3) spawn();
-        for (let i = embers.length - 1; i >= 0; i--) {
-          const e = embers[i];
-          e.x += e.vx;
-          e.y += e.vy;
-          e.life++;
-          const progress = e.life / e.maxLife;
-          if (progress >= 1) { embers.splice(i, 1); continue; }
-          const a = e.alpha * (1 - progress);
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(245,158,11,${a})`;
-          ctx.fill();
-          // glow
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, e.r * 3, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(245,158,11,${a * 0.15})`;
-          ctx.fill();
+        ctx.clearRect(0,0,W,H);
+        if (Math.random()<0.3) spawn();
+        for (var i=embers.length-1;i>=0;i--) {
+          var e=embers[i]; e.x+=e.vx; e.y+=e.vy; e.life++;
+          var p=e.life/e.maxLife;
+          if (p>=1){embers.splice(i,1);continue;}
+          var a=e.alpha*(1-p);
+          ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2);
+          ctx.fillStyle='rgba(245,158,11,'+a+')'; ctx.fill();
+          ctx.beginPath(); ctx.arc(e.x,e.y,e.r*3,0,Math.PI*2);
+          ctx.fillStyle='rgba(245,158,11,'+(a*0.15)+')'; ctx.fill();
         }
         requestAnimationFrame(tick);
       }
       tick();
-    })();
+    }
   </script>
 </body>
 </html>
