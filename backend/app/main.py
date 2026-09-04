@@ -55,11 +55,21 @@ if _frontend_dist.exists():
     # Mount static assets (JS, CSS, images) at /assets
     app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="assets")
 
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        """SPA fallback: serve index.html for all non-API routes."""
+    @app.get("/")
+    async def serve_landing():
+        """Serve the cinematic landing page at root."""
+        landing = _frontend_dist / "landing.html"
+        if landing.exists():
+            return FileResponse(str(landing))
+        # Fallback to React app if no landing page
         return FileResponse(str(_frontend_dist / "index.html"))
 
-    print(f"✨ Serving frontend from {_frontend_dist}")
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """SPA fallback: serve index.html for all non-API, non-landing routes."""
+        # Serve the React app for all client-side routes
+        return FileResponse(str(_frontend_dist / "index.html"))
+
+    print(f"✨ Serving landing + frontend from {_frontend_dist}")
 else:
     print(f"⚠️  Frontend dist not found at {_frontend_dist} — API only")
