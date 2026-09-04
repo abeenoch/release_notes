@@ -62,6 +62,22 @@
       transition: box-shadow 0.3s, transform 0.2s;
     }
     .nav-cta:hover { box-shadow: 0 0 36px var(--accent-glow); transform: translateY(-1px); }
+    .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .nav-star {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.5rem 1rem; border-radius: 8px;
+      border: 1px solid var(--surface-border);
+      color: var(--text); background: rgba(255,255,255,0.04);
+      font-size: 0.875rem; font-weight: 600; text-decoration: none;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .nav-star:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); transform: translateY(-1px); }
+    .nav-star svg { color: var(--text-dim); }
+    .nav-star .count {
+      font-size: 0.75rem; font-weight: 500; color: var(--text-dim);
+      padding: 0.1rem 0.5rem; border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+    }
     .hero {
       position: relative; z-index: 1;
       min-height: 100vh; display: flex; flex-direction: column;
@@ -111,6 +127,27 @@
     .hero-cta svg { transition: transform 0.3s; }
     .hero-cta:hover svg { transform: translateX(4px); }
     .hero-cta:disabled { opacity: 0.6; cursor: wait; }
+    .hero-actions {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      justify-content: center;
+      opacity: 0; animation: fadeUp 0.8s ease 0.8s forwards;
+    }
+    .hero-actions .hero-cta { opacity: 1; animation: none; }
+    .hero-star {
+      display: inline-flex; align-items: center; gap: 0.55rem;
+      padding: 0.9rem 1.5rem; border-radius: 12px;
+      border: 1px solid var(--surface-border);
+      color: var(--text); background: rgba(255,255,255,0.04);
+      font-size: 1rem; font-weight: 600; text-decoration: none;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .hero-star:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); transform: translateY(-2px); }
+    .hero-star svg { color: var(--accent); }
+    .hero-star .count {
+      font-size: 0.8rem; font-weight: 600; color: var(--text-dim);
+      padding: 0.15rem 0.6rem; border-radius: 999px;
+      border: 1px solid var(--surface-border);
+    }
     .forge-stage {
       position: relative; z-index: 1; width: 100%; max-width: 720px;
       margin: 3rem auto 0; height: 320px;
@@ -222,17 +259,31 @@
       <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
       <span>Release Notes</span>
     </div>
-    <a href="#features" class="nav-cta" id="nav-cta">Get Started</a>
+    <div class="nav-actions">
+      <a href="https://github.com/abeenoch/release_notes" target="_blank" rel="noopener" class="nav-star" aria-label="Star Release Notes on GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.19a11.04 11.04 0 0 1 5.8 0c2.2-1.5 3.17-1.19 3.17-1.19.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.41-5.25 5.69.41.36.78 1.06.78 2.14 0 1.54-.01 2.79-.01 3.17 0 .31.2.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>
+        Star
+        <span class="count" id="nav-star-count">0</span>
+      </a>
+      <a href="#features" class="nav-cta" id="nav-cta">Get Started</a>
+    </div>
   </nav>
 
   <section class="hero">
     <div class="hero-badge"><span class="dot"></span> AI-powered changelogs</div>
     <h1>Forge clarity from <span class="accent">every commit</span></h1>
     <p>Stop hand-writing release notes. Connect your repos, and let AI transform raw commits into beautiful, structured changelogs — delivered automatically on every push.</p>
-    <button class="hero-cta" id="cta-btn" onclick="startOAuth()">
-      Light the Forge
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-    </button>
+    <div class="hero-actions">
+      <button class="hero-cta" id="cta-btn" onclick="startOAuth()">
+        Light the Forge
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
+      <a href="https://github.com/abeenoch/release_notes" target="_blank" rel="noopener" class="hero-star" aria-label="Star Release Notes on GitHub">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.19a11.04 11.04 0 0 1 5.8 0c2.2-1.5 3.17-1.19 3.17-1.19.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.41-5.25 5.69.41.36.78 1.06.78 2.14 0 1.54-.01 2.79-.01 3.17 0 .31.2.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>
+        Star
+        <span class="count" id="hero-star-count">0</span>
+      </a>
+    </div>
     <div class="forge-stage">
       <div class="forge-inputs">
         <div class="forge-input">fix: resolve auth redirect loop on callback</div>
@@ -309,10 +360,34 @@
       localStorage.setItem('arn_token', data.access_token);
     }
 
+    // ── Star count (best-effort) ────────────────────────────
+    function loadStarCount() {
+      var counts = [document.getElementById('nav-star-count'),
+                    document.getElementById('hero-star-count')];
+      if (!counts[0] && !counts[1]) return;
+      function fmt(n) {
+        if (n >= 1000) return (n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0) + 'k';
+        return String(n);
+      }
+      fetch('https://api.github.com/repos/abeenoch/release_notes', {
+        headers: { 'Accept': 'application/vnd.github+json' }
+      })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(data) {
+          if (!data || typeof data.stargazers_count !== 'number') return;
+          var s = fmt(data.stargazers_count);
+          counts.forEach(function(el) { if (el) el.textContent = s; });
+        })
+        .catch(function() { /* keep default 0 */ });
+    }
+
     // ── Init ────────────────────────────────────────────────
     (async function() {
       var params = new URLSearchParams(window.location.search);
       var code = params.get('code');
+
+      // Kick off star count fetch (don't block init)
+      loadStarCount();
 
       // 1) Just returned from GitHub OAuth → exchange code
       if (code) {
