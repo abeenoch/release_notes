@@ -85,6 +85,16 @@ class ChangelogService:
                     from_ref = git.get_root_sha()
                     full_history = True
 
+        # HARDENING: only diff an incremental range when it's actually valid.
+        # A force-push / history rewrite can make the stored from_ref (or a
+        # passed from-tag) no longer an ancestor of to_ref. In that case we
+        # reset to full history (and clear incremental tracking) so we never
+        # emit an overlapping/misleading partial range.
+        if from_ref and to_ref and not git.is_ancestor(from_ref, to_ref):
+            from_ref = git.get_root_sha()
+            full_history = True
+            incremental = False
+
         # 3. Get git data
         diff_summary = git.get_diff_summary(from_ref, to_ref)
         diff_patch = git.get_diff_patch(from_ref, to_ref)

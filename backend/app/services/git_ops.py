@@ -43,32 +43,43 @@ class GitClient:
         previous = tags[-2] if len(tags) >= 2 else (tags[-1] if tags else None)
         return from_tag or previous, to_tag or latest
 
-    def get_diff_summary(self, from_ref: str, to_ref: str) -> str:
-        """Get the commit log between two refs."""
+    def is_ancestor(self, ancestor_ref: str, descendant_ref: str = "HEAD") -> bool:
+        """
+        Return True if ancestor_ref is an ancestor of descendant_ref.
+        False also when the refs don't resolve (e.g. rewritten history).
+        """
         try:
-            commits = list(self.repo.iter_commits(f"{from_ref}..{to_ref}"))
-            if not commits:
-                return "(no commits found between these refs)"
-
-            lines: list[str] = []
-            for commit in commits:
-                date = commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                msg = commit.message.split("\n")[0].strip()
-                lines.append(f"[{commit.hexsha[:7]}] {date} — {msg}")
-            return "\n".join(lines)
-
+            # `git merge-base --is-ancestor` exits 0 (no output) if ancestor,
+            # non-zero otherwise; GitPython raises on non-zero exit.
+            self.repo.git.merge_base("--is-ancestor", ancestor_ref, descendant_ref)
+            return True
         except GitCommandError:
-            # Try with from_ref alone (e.g., when from_ref is a parent)
-            try:
-                commits = list(self.repo.iter_commits(to_ref, max_count=50))
-                lines = []
-                for commit in commits:
-                    date = commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                    msg = commit.message.split("\n")[0].strip()
-                    lines.append(f"[{commit.hexsha[:7]}] {date} — {msg}")
-                return "\n".join(lines)
-            except GitCommandError:
-                return "(could not retrieve commits)"
+            return False
+
+    def get_diff_summary(self, from_ref: str | None, to_ref: str) -> str:
+        """Get the commit log between two refs.
+
+        No silent fallback is attempted — if the range is invalid the caller
+        is responsible for resetting tracking, so we never emit an overlapping
+        "recent N commits" dump.
+        """
+        try:
+            if from_ref:
+                commits = list(self.repo.iter_commits(f"{from_ref}..{to_ref}"))
+            else:
+                commits = list(self.repo.iter_commits(to_ref))
+        except GitCommandError:
+            return "(could not retrieve commits)"
+
+        if not commits:
+            return "(no commits found between these refs)"
+
+        lines: list[str] = []
+        for commit in commits:
+            date = commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            msg = commit.message.split("\n")[0].strip()
+            lines.append(f"[{commit.hexsha[:7]}] {date} — {msg}")
+        return "\n".join(lines)
 
     def get_diff_patch(self, from_ref: str, to_ref: str) -> str | None:
         """Get the raw diff (code changes) between two refs, truncated."""
