@@ -23,6 +23,10 @@ backend/data/repos/
 *.swp
 *.swo
 
+# Cline (agent config / memory) — local tooling, not part of the app
+.cline/
+.clinerules
+
 # OS
 .DS_Store
 Thumbs.db
