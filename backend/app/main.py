@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -69,6 +70,23 @@ if _frontend_dist.exists():
         """Redirect old /login route to root (cinematic page owns auth)."""
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/")
+
+    # ── Favicon ───────────────────────────────────────────
+    # Serve the brand favicon explicitly so it isn't swallowed by the
+    # SPA catch-all below.
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def favicon_svg():
+        favicon = _frontend_dist / "favicon.svg"
+        if favicon.exists():
+            return FileResponse(str(favicon), media_type="image/svg+xml")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon_ico():
+        favicon = _frontend_dist / "favicon.ico"
+        if favicon.exists():
+            return FileResponse(str(favicon), media_type="image/x-icon")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):

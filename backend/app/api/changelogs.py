@@ -162,6 +162,8 @@ async def list_changelogs(
             version=c.version, previous_version=c.previous_version,
             summary=c.summary, raw_markdown=c.raw_markdown,
             llm_provider=c.llm_provider, commit_count=c.commit_count,
+            status=c.status, error_message=c.error_message,
+            notification_status=c.notification_status,
             created_at=c.created_at,
         )
         for c in changelogs
@@ -189,6 +191,8 @@ async def get_changelog(
         version=changelog.version, previous_version=changelog.previous_version,
         summary=changelog.summary, raw_markdown=changelog.raw_markdown,
         llm_provider=changelog.llm_provider, commit_count=changelog.commit_count,
+        status=changelog.status, error_message=changelog.error_message,
+        notification_status=changelog.notification_status,
         created_at=changelog.created_at,
     )
     await db.delete(config)
