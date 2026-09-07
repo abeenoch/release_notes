@@ -8,11 +8,6 @@
       location.replace('/repos');
       return;
     }
-    var params = new URLSearchParams(location.search);
-    if (params.get('code')) {
-      location.replace('/login' + location.search + location.hash);
-      return;
-    }
   })();
   </script>
   <meta charset="UTF-8" />
@@ -350,9 +345,23 @@
     function startOAuth() {
       var url = 'https://github.com/login/oauth/authorize'
         + '?client_id=' + encodeURIComponent(CLIENT_ID)
-        + '&redirect_uri=' + encodeURIComponent(window.location.origin + '/login')
+        + '&redirect_uri=' + encodeURIComponent(window.location.origin + '/')
         + '&scope=' + encodeURIComponent(SCOPES);
       window.location.href = url;
+    }
+
+    async function exchangeCode(code) {
+      var res = await fetch('/api/auth/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code })
+      });
+      if (!res.ok) {
+        var data = await res.json().catch(function() { return {}; });
+        throw new Error(data.detail || 'Authentication failed');
+      }
+      var data = await res.json();
+      localStorage.setItem('arn_token', data.access_token);
     }
 
     // ── Star count (best-effort) ────────────────────────────
@@ -377,8 +386,29 @@
     }
 
     // ── Init ────────────────────────────────────────────────
-    loadStarCount();
-    initEmbers();
+    (async function() {
+      var params = new URLSearchParams(window.location.search);
+      var code = params.get('code');
+
+      // Kick off star count fetch (don't block init)
+      loadStarCount();
+
+      // Just returned from GitHub OAuth → exchange code
+      if (code) {
+        try {
+          await exchangeCode(code);
+          window.history.replaceState({}, '', '/');
+          window.location.replace('/repos');
+          return;
+        } catch (err) {
+          alert('Sign-in failed: ' + err.message);
+          window.history.replaceState({}, '', '/');
+        }
+      }
+
+      // Not authenticated → show cinematic experience
+      initEmbers();
+    })();
 
     // ── Ember particles ─────────────────────────────────────
     function initEmbers() {
