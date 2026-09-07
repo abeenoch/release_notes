@@ -33,7 +33,8 @@ export function NotificationsPage() {
         body.smtp_user = smtpUser || null
         body.smtp_pass = smtpPass || null
         body.from_email = fromEmail || null
-        body.to_email = toEmail || null
+        // Convert newline-separated recipients to comma-separated for SMTP
+        body.to_email = toEmail ? toEmail.split('\n').map(s => s.trim()).filter(Boolean).join(', ') : null
       } else {
         body.slack_webhook_url = slackUrl
         body.slack_channel = slackChannel || null
@@ -103,12 +104,18 @@ export function NotificationsPage() {
               <label className={labelCls}>From email</label>
               <input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="releases@example.com" className={inputCls} />
             </div>
-            <div>
-              <label className={labelCls}>To email</label>
-              <input value={toEmail} onChange={(e) => setToEmail(e.target.value)} placeholder="you@example.com" className={inputCls} />
+            <div className="sm:col-span-2">
+              <label className={labelCls}>To recipients <span className="text-zinc-400">(one per line)</span></label>
+              <textarea
+                value={toEmail}
+                onChange={(e) => setToEmail(e.target.value)}
+                placeholder={"alice@example.com\nbob@example.com"}
+                rows={3}
+                className={inputCls + ' resize-y min-h-[70px]'}
+              />
             </div>
-          </div>
-        ) : (
+            </div>
+          ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className={labelCls}>Slack webhook URL</label>
