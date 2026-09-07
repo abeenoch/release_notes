@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+  // Blocking auth check — runs before any rendering, prevents flash
+  (function(){
+    if (localStorage.getItem('arn_token')) {
+      location.replace('/repos');
+      return;
+    }
+    var params = new URLSearchParams(location.search);
+    if (params.get('code')) {
+      location.replace('/login' + location.search + location.hash);
+      return;
+    }
+  })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Release Notes — Forge clarity from every commit</title>
@@ -330,34 +344,15 @@
   <script>
     // ── Config ──────────────────────────────────────────────
     var CLIENT_ID = 'Ov23ligbTLjZzb1vZuMr';
-    var REDIRECT_URI = window.location.origin + '/';
     var SCOPES = 'repo,user:email';
-
-    // ── Auth state ──────────────────────────────────────────
-    function getToken() { return localStorage.getItem('arn_token'); }
-    function hasToken() { return !!getToken(); }
 
     // ── OAuth flow ──────────────────────────────────────────
     function startOAuth() {
       var url = 'https://github.com/login/oauth/authorize'
         + '?client_id=' + encodeURIComponent(CLIENT_ID)
-        + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
+        + '&redirect_uri=' + encodeURIComponent(window.location.origin + '/login')
         + '&scope=' + encodeURIComponent(SCOPES);
       window.location.href = url;
-    }
-
-    async function exchangeCode(code) {
-      var res = await fetch('/api/auth/github', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code })
-      });
-      if (!res.ok) {
-        var data = await res.json().catch(function() { return {}; });
-        throw new Error(data.detail || 'Authentication failed');
-      }
-      var data = await res.json();
-      localStorage.setItem('arn_token', data.access_token);
     }
 
     // ── Star count (best-effort) ────────────────────────────
@@ -382,37 +377,8 @@
     }
 
     // ── Init ────────────────────────────────────────────────
-    (async function() {
-      var params = new URLSearchParams(window.location.search);
-      var code = params.get('code');
-
-      // Kick off star count fetch (don't block init)
-      loadStarCount();
-
-      // 1) Just returned from GitHub OAuth → exchange code
-      if (code) {
-        try {
-          await exchangeCode(code);
-          // Clean URL and go to dashboard
-          window.history.replaceState({}, '', '/');
-          window.location.replace('/repos');
-          return;
-        } catch (err) {
-          alert('Sign-in failed: ' + err.message);
-          window.history.replaceState({}, '', '/');
-        }
-      }
-
-      // 2) Already authenticated → go to dashboard
-      if (hasToken()) {
-        window.location.replace('/repos');
-        return;
-      }
-
-      // 3) Not authenticated → show cinematic experience
-      // (page content is already visible; init ember particles)
-      initEmbers();
-    })();
+    loadStarCount();
+    initEmbers();
 
     // ── Ember particles ─────────────────────────────────────
     function initEmbers() {

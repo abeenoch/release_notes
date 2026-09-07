@@ -8,7 +8,7 @@ const CLIENT_ID = 'Ov23ligbTLjZzb1vZuMr'
 const SCOPES = 'repo,user:email'
 
 function startOAuth() {
-  const redirectUri = window.location.origin + '/'
+  const redirectUri = window.location.origin + '/login'
   window.location.href =
     'https://github.com/login/oauth/authorize'
     + `?client_id=${encodeURIComponent(CLIENT_ID)}`

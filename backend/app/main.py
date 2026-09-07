@@ -65,12 +65,6 @@ if _frontend_dist.exists():
         # Fallback to React app if no landing page
         return FileResponse(str(_frontend_dist / "index.html"))
 
-    @app.get("/login")
-    async def redirect_login():
-        """Redirect old /login route to root (cinematic page owns auth)."""
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="/")
-
     # ── Favicon ───────────────────────────────────────────
     # Serve the brand favicon explicitly so it isn't swallowed by the
     # SPA catch-all below.

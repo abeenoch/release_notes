@@ -79,7 +79,19 @@ export function ChangelogDetailPage() {
 
   const copy = async () => {
     if (!changelog?.raw_markdown) return
-    await navigator.clipboard.writeText(changelog.raw_markdown)
+    try {
+      await navigator.clipboard.writeText(changelog.raw_markdown)
+    } catch {
+      // Fallback for older browsers / insecure context
+      const ta = document.createElement('textarea')
+      ta.value = changelog.raw_markdown
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
