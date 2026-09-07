@@ -24,6 +24,8 @@ class NotifyProviderInterface(ABC):
         to_addr: str,
         subject: str,
         body: str,
+        html_body: str | None = None,
     ) -> None:
-        """Send a notification with the given subject and body."""
+        """Send a notification. html_body, when given, is a pre-rendered rich
+        HTML alternative (falls back to a simple markdown-to-HTML conversion)."""
         ...

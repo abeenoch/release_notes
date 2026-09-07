@@ -15,7 +15,11 @@ from app.schemas.changelog import (
     ChangelogTriggerRequest, ChangelogResponse, ChangelogListResponse,
 )
 from app.services.changelog_service import ChangelogService
+from app.services import publish_service
 from app.tasks.worker import run_changelog_generation
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/changelogs", tags=["changelogs"])
 
@@ -96,6 +100,68 @@ async def delete_llm_config(
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config not found")
+
+# ── Publishing: GitHub Release + CHANGELOG.md commit ──
+
+
+async def _load_changelog_and_repo(
+    changelog_id: str, user_id: str, db: AsyncSession
+) -> tuple[ChangelogModel, Repository]:
+    result = await db.execute(
+        select(ChangelogModel).where(
+            ChangelogModel.id == changelog_id,
+            ChangelogModel.user_id == user_id,
+        )
+    )
+    changelog = result.scalar_one_or_none()
+    if not changelog:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Changelog not found")
+    if changelog.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only completed changelogs can be published",
+        )
+    repo = await db.get(Repository, changelog.repo_id)
+    if not repo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    return changelog, repo
+
+
+@router.post("/{changelog_id}/publish-release")
+async def publish_github_release(
+    changelog_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a GitHub Release on the changelog's tag with the generated notes."""
+    changelog, repo = await _load_changelog_and_repo(changelog_id, user_id, db)
+    try:
+        result = await publish_service.publish_release(changelog, repo, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:  # GitHub API errors → 502 with detail
+        logger.exception("Release publish failed for changelog %s", changelog_id)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)[:500])
+    return result
+
+
+@router.post("/{changelog_id}/commit-changelog")
+async def commit_changelog_file(
+    changelog_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create or update CHANGELOG.md in the target repository."""
+    changelog, repo = await _load_changelog_and_repo(changelog_id, user_id, db)
+    try:
+        result = await publish_service.commit_changelog_file(changelog, repo, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        logger.exception("CHANGELOG.md commit failed for changelog %s", changelog_id)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)[:500])
+    return result
+
 # ── Changelog Generation ──
 
 

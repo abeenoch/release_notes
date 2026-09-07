@@ -50,15 +50,16 @@ class SmtpProvider(NotifyProviderInterface):
         to_addr: str,
         subject: str,
         body: str,
+        html_body: str | None = None,
     ) -> None:
-        html_body = _md_to_html(body)
+        html = html_body or _md_to_html(body)
         msg = EmailMessage()
         msg["From"] = from_addr
         msg["To"] = to_addr
         msg["Subject"] = subject
         msg.set_content(body)
         msg.add_alternative(
-            f'<div style="font-family: sans-serif;">{html_body}</div>',
+            f'<div style="font-family: sans-serif;">{html}</div>',
             subtype="html",
         )
         use_tls = self.port == 465 or self.secure

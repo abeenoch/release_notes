@@ -10,6 +10,7 @@ from app.core.security import decrypt_api_key
 from app.models.changelog import Changelog as ChangelogModel
 from app.models.notify_config import UserNotifyConfig
 from app.services.notify.factory import create_notify_provider
+from app.services.email_template import changelog_email_html
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +68,17 @@ class NotificationService:
         """
         body = changelog.raw_markdown or "*No changelog content.*"
         subject = self.build_subject(cfg, changelog)
+        html_body = changelog_email_html(
+            subject=subject.replace(cfg.subject_prefix or "[Changelog]", "").strip() or subject,
+            markdown=body,
+        )
 
         if cfg.provider == "slack":
             if not cfg.slack_webhook_url:
                 logger.warning("Slack config missing webhook URL — skipping")
                 return "skipped"
             provider = self.build_provider(cfg)
-            await provider.send(from_addr="", to_addr="", subject=subject, body=body)
+            await provider.send(from_addr="", to_addr="", subject=subject, body=body, html_body=html_body)
             return "sent"
 
         # SMTP / SendGrid require from + to email
@@ -98,6 +103,7 @@ class NotificationService:
             to_addr=cfg.to_email,
             subject=subject,
             body=body,
+            html_body=html_body,
         )
         return "sent"
 

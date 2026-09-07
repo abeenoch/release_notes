@@ -39,15 +39,16 @@ class SendGridProvider(NotifyProviderInterface):
         to_addr: str,
         subject: str,
         body: str,
+        html_body: str | None = None,
     ) -> None:
-        html_body = _md_to_html(body)
+        html = html_body or _md_to_html(body)
         message = Mail(
             from_email=from_addr,
             to_emails=to_addr,
             subject=subject,
             html_content=Content(
                 "text/html",
-                f'<div style="font-family: sans-serif;">{html_body}</div>',
+                f'<div style="font-family: sans-serif;">{html}</div>',
             ),
         )
         # SendGrid's client.send is synchronous — don't await it
