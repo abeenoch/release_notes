@@ -199,6 +199,11 @@ async def generate_changelog(
     await db.flush()
     await db.refresh(changelog)
 
+    # Commit explicitly so the background task (which uses its own session)
+    # can see this row — otherwise it opens a fresh session, finds nothing,
+    # and the changelog is left stuck in "pending". (Same pattern as webhooks.)
+    await db.commit()
+
     # Enqueue the background task
     background_tasks.add_task(run_changelog_generation, changelog.id)
 
