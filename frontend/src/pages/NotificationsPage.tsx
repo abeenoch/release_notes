@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, Trash2 } from 'lucide-react'
 import { notifyApi } from '../lib'
 import type { NotifyConfig } from '../lib'
+import { BrandIcon } from '../components/BrandIcon'
 
 export function NotificationsPage() {
   const [configs, setConfigs] = useState<NotifyConfig[]>([])
@@ -76,10 +77,13 @@ export function NotificationsPage() {
       <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 max-w-xs">
           <label className={labelCls}>Provider</label>
-          <select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputCls}>
-            <option value="smtp">Email (SMTP)</option>
-            <option value="slack">Slack</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputCls}>
+              <option value="smtp">Email (SMTP)</option>
+              <option value="slack">Slack</option>
+            </select>
+            <BrandIcon provider={provider} size={18} />
+          </div>
         </div>
 
         {provider === 'smtp' ? (
@@ -145,9 +149,7 @@ export function NotificationsPage() {
           configs.map((c) => (
             <div key={c.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-                  {c.provider === 'slack' ? '#' : '@'}
-                </div>
+                <BrandIcon provider={c.provider} size={18} />
                 <div>
                   <span className="text-sm font-medium capitalize text-zinc-900 dark:text-zinc-50">{c.provider}</span>
                   <p className="text-xs text-zinc-400">

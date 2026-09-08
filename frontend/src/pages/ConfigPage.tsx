@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, Trash2, Check } from 'lucide-react'
 import { configApi } from '../lib'
 import type { LlmConfig } from '../lib'
+import { BrandIcon } from '../components/BrandIcon'
 
 const PROVIDERS = [
   { id: 'commit', label: 'Commit Parser (no LLM)', needsKey: false },
@@ -72,11 +73,14 @@ export function ConfigPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls}>Provider</label>
-            <select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputCls}>
-              {PROVIDERS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputCls}>
+                {PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+              <BrandIcon provider={provider} size={18} />
+            </div>
           </div>
           <div>
             <label className={labelCls}>
@@ -111,9 +115,7 @@ export function ConfigPage() {
           configs.map((c) => (
             <div key={c.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${c.is_active ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400' : 'bg-zinc-50 text-zinc-400 dark:bg-zinc-800'}`}>
-                  <Check size={16} />
-                </div>
+                <BrandIcon provider={c.provider} size={18} />
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium capitalize text-zinc-900 dark:text-zinc-50">{c.provider}</span>
