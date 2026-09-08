@@ -14,6 +14,14 @@ class LlmConfigCreate(BaseModel):
     base_url: str | None = None
 
 
+class LlmConfigUpdate(BaseModel):
+    """Partial update for an existing LLM config."""
+    api_key: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    is_active: bool | None = None
+
+
 class LlmConfigResponse(BaseModel):
     id: str
     provider: str

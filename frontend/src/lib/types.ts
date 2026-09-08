@@ -59,7 +59,9 @@ export interface NotifyConfig {
   smtp_host?: string | null
   smtp_port?: number | null
   smtp_user?: string | null
+  has_smtp_pass?: boolean
   smtp_secure?: boolean | null
+  has_sendgrid_key?: boolean
   sendgrid_api_key?: string | null
   slack_webhook_url?: string | null
   slack_channel?: string | null

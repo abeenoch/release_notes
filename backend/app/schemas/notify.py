@@ -29,6 +29,23 @@ class NotifyConfigCreate(BaseModel):
     subject_prefix: str | None = None
 
 
+class NotifyConfigUpdate(BaseModel):
+    """Partial update for an existing notification config."""
+    provider: str | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_pass: str | None = None
+    smtp_secure: bool | None = None
+    sendgrid_api_key: str | None = None
+    slack_webhook_url: str | None = None
+    slack_channel: str | None = None
+    from_email: str | None = None
+    to_email: str | None = None
+    subject_prefix: str | None = None
+    is_active: bool | None = None
+
+
 class NotifyConfigResponse(BaseModel):
     id: str
     provider: str

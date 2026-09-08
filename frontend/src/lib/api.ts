@@ -80,11 +80,15 @@ export const publishApi = {
 export const configApi = {
   listLlms: () => request<LlmConfig[]>('GET', '/changelogs/configs'),
   createLlm: (data: unknown) => request<LlmConfig>('POST', '/changelogs/configs', data),
+  updateLlm: (id: string, data: unknown) =>
+    request<LlmConfig>('PATCH', `/changelogs/configs/${id}`, data),
   removeLlm: (id: string) => request<void>('DELETE', `/changelogs/configs/${id}`),
 }
 
 export const notifyApi = {
   list: () => request<{ configs: NotifyConfig[] }>('GET', '/notify/configs'),
   create: (data: unknown) => request<NotifyConfig>('POST', '/notify/configs', data),
+  update: (id: string, data: unknown) =>
+    request<NotifyConfig>('PATCH', `/notify/configs/${id}`, data),
   remove: (id: string) => request<void>('DELETE', `/notify/configs/${id}`),
 }

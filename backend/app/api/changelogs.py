@@ -11,7 +11,7 @@ from app.models.repo import Repository
 from app.models.user_config import UserLlmConfig
 from app.models.changelog import Changelog as ChangelogModel
 from app.schemas.changelog import (
-    LlmConfigCreate, LlmConfigResponse,
+    LlmConfigCreate, LlmConfigResponse, LlmConfigUpdate,
     ChangelogTriggerRequest, ChangelogResponse, ChangelogListResponse,
 )
 from app.services.changelog_service import ChangelogService
@@ -82,6 +82,58 @@ async def create_llm_config(
         id=config.id, provider=config.provider, model=config.model,
         base_url=config.base_url, is_active=True,
         has_api_key=True, created_at=config.created_at,
+    )
+
+
+@router.patch("/configs/{config_id}", response_model=LlmConfigResponse)
+async def update_llm_config(
+    config_id: str,
+    body: LlmConfigUpdate,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserLlmConfig).where(
+            UserLlmConfig.id == config_id,
+            UserLlmConfig.user_id == user_id,
+        )
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config not found")
+
+    # When activating this config, deactivate all the others for this user
+    if body.is_active is True and not config.is_active:
+        others = await db.execute(
+            select(UserLlmConfig).where(
+                UserLlmConfig.user_id == user_id,
+                UserLlmConfig.id != config_id,
+                UserLlmConfig.is_active == True,
+            )
+        )
+        for other in others.scalars().all():
+            other.is_active = False
+
+    if body.api_key is not None:
+        if body.api_key == "":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot clear an API key — send the new key to replace it",
+            )
+        config.api_key_encrypted = encrypt_api_key(body.api_key)
+    if body.model is not None:
+        config.model = body.model or None
+    if body.base_url is not None:
+        config.base_url = body.base_url or None
+    if body.is_active is not None:
+        config.is_active = body.is_active
+
+    await db.flush()
+    await db.refresh(config)
+    return LlmConfigResponse(
+        id=config.id, provider=config.provider, model=config.model,
+        base_url=config.base_url, is_active=config.is_active,
+        has_api_key=bool(config.api_key_encrypted), created_at=config.created_at,
     )
 
 
