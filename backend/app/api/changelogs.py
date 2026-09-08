@@ -100,6 +100,8 @@ async def delete_llm_config(
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config not found")
+    await db.delete(config)
+    return None
 
 # ── Publishing: GitHub Release + CHANGELOG.md commit ──
 
@@ -266,4 +268,3 @@ async def get_changelog(
         notification_status=changelog.notification_status,
         created_at=changelog.created_at,
     )
-    await db.delete(config)

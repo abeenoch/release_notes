@@ -23,6 +23,7 @@ export function ConfirmButton({
   disabled?: boolean
 }) {
   const [armed, setArmed] = useState(false)
+  const [error, setError] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => {
@@ -32,13 +33,28 @@ export function ConfirmButton({
   const click = async () => {
     if (!armed) {
       setArmed(true)
+      setError('')
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => setArmed(false), 3500)
       return
     }
     if (timer.current) clearTimeout(timer.current)
     setArmed(false)
-    await onConfirm()
+    try {
+      await onConfirm()
+    } catch (e) {
+      // Surface failures instead of failing silently
+      setError((e as Error).message || 'Delete failed')
+      timer.current = setTimeout(() => setError(''), 4000)
+    }
+  }
+
+  if (error) {
+    return (
+      <span className="inline-flex max-w-[220px] items-center rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-400" title={error}>
+        <span className="truncate">{error}</span>
+      </span>
+    )
   }
 
   if (armed) {
