@@ -3,6 +3,7 @@ import { Loader2, Trash2 } from 'lucide-react'
 import { notifyApi } from '../lib'
 import type { NotifyConfig } from '../lib'
 import { BrandIcon } from '../components/BrandIcon'
+import { ConfirmButton } from '../components/ConfirmButton'
 
 export function NotificationsPage() {
   const [configs, setConfigs] = useState<NotifyConfig[]>([])
@@ -51,7 +52,6 @@ export function NotificationsPage() {
   }
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this notification config?')) return
     await notifyApi.remove(id)
     await load()
   }
@@ -159,10 +159,9 @@ export function NotificationsPage() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => remove(c.id)}
-                className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+              <ConfirmButton onConfirm={() => remove(c.id)} title="Delete config">
                 <Trash2 size={16} />
-              </button>
+              </ConfirmButton>
             </div>
           ))
         )}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Loader2, RefreshCw, Trash2, GitBranch, X } from 'lucide-react'
 import { reposApi } from '../lib'
 import type { Repository, GitHubRepo } from '../lib'
+import { ConfirmButton } from '../components/ConfirmButton'
 
 export function ReposPage() {
   const [repos, setRepos] = useState<Repository[]>([])
@@ -57,7 +58,6 @@ export function ReposPage() {
   }
 
   const remove = async (id: string) => {
-    if (!confirm('Remove this repository from Release Notes?')) return
     await reposApi.remove(id)
     await load()
   }
@@ -111,13 +111,12 @@ export function ReposPage() {
                   </p>
                 </div>
               </Link>
-              <button
-                onClick={() => remove(repo.id)}
-                className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                aria-label={`Remove ${repo.full_name}`}
+              <ConfirmButton
+                onConfirm={() => remove(repo.id)}
+                title={`Remove ${repo.full_name}`}
               >
                 <Trash2 size={16} />
-              </button>
+              </ConfirmButton>
             </div>
           ))}
         </div>

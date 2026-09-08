@@ -3,6 +3,7 @@ import { Loader2, Trash2, Check } from 'lucide-react'
 import { configApi } from '../lib'
 import type { LlmConfig } from '../lib'
 import { BrandIcon } from '../components/BrandIcon'
+import { ConfirmButton } from '../components/ConfirmButton'
 
 const PROVIDERS = [
   { id: 'commit', label: 'Commit Parser (no LLM)', needsKey: false },
@@ -46,7 +47,6 @@ export function ConfigPage() {
   }
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this LLM config?')) return
     await configApi.removeLlm(id)
     await load()
   }
@@ -126,10 +126,9 @@ export function ConfigPage() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => remove(c.id)}
-                className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+              <ConfirmButton onConfirm={() => remove(c.id)} title="Delete config">
                 <Trash2 size={16} />
-              </button>
+              </ConfirmButton>
             </div>
           ))
         )}
