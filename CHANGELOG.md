@@ -1,29 +1,32 @@
-# Changelog — f2cf1ae
+# Changelog — c8448a6
 
-_Updates since 6fc85814783ed9a98f32a3f68205a1a1d8a93117, through f2cf1ae_
+_Updates since 4ad29d955471e013c63c04d293ff959658273718, through c8448a6_
 
-# Changelog — f2cf1ae
+# Changelog — c8448a6
 
 ## Summary
-This release adds a full‑stack detail view, dark theme support, and a complete frontend source bundle. On the backend it introduces GitHub release publishing, CHANGELOG.md committing, and rich HTML email notifications.
+Corrected timestamp handling across API response schemas so that UTC times are emitted with proper timezone information, preventing a one‑hour offset in client displays.
 
 ## Features
-- Added API endpoints to publish a GitHub release and commit a `CHANGELOG.md` file for a completed changelog.  
-- Implemented helper to load changelog and repository data with validation.  
-- Introduced `publish_service` integration for release creation and file commits.  
-- Created a new HTML email template (`email_template.py`) for branded changelog notifications.  
-- Notification service now generates and sends HTML email bodies alongside plain text.  
-- Extended `NotifyProviderInterface` to accept an optional `html_body` argument.  
-- Added `create_release` and `get_or_create_file_commit` methods to the GitHub client for release creation and file updates.  
-- Updated Slack and SMTP/SendGrid providers to handle the new `html_body` parameter.  
-- Frontend enhancements: detail view UI, dark theme styling, and inclusion of the full source code in the build.
+*None*
 
 ## Bug Fixes
-- *(none)*
+- Fixed timestamps that appeared ~1 hour off by attaching UTC tzinfo to naive `created_at` fields in changelog, LLM config, notify config, and repository response schemas. The API now returns ISO‑8601 strings with a “Z” suffix.
 
 ## Other Changes
-- Minor refactor of notification service to build HTML content before sending.  
-- Updated imports and added logger for better error tracing in publishing endpoints.  
+- Added a shared `_ensure_utc` helper and `field_validator` hooks to the affected Pydantic models.
 
 ## Full Commit Log
-- f2cf1ae — feat: detail view, publish release, dark theme, email HTML, full frontend source
+```
+c8448a6 2026-09-09 12:09:35 — fix: timestamps showed ~1h off (naive UTC misread as local)
+
+SQLite stores created_at as UTC but returns naive datetimes (no
+tzinfo), so the API serialized them without an offset (e.g.
+'2026-09-09T09:53:31'). Browsers' new Date() then interpreted those
+as local time — a UTC+1 user saw a just-created item as '1 hour ago'.
+
+Attach UTC tzinfo via a field_validator(mode='before') on created_at
+in every response schema (changelog, llm config, notify config, repo).
+The API now emits '...Z' offsets and browsers convert to local time
+correctly.
+```
