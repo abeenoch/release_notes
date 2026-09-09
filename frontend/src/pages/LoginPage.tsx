@@ -41,15 +41,15 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-zinc-950">
-      <div className="flex flex-1 flex-col justify-center px-16 max-w-xl">
-        <div className="mb-12">
+      <div className="flex flex-1 flex-col justify-center px-6 py-10 md:px-16">
+        <div className="pb-10">
           <div className="mb-6 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600">
               <FileText size={22} className="text-white" />
             </div>
             <span className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Release Notes</span>
           </div>
-          <h1 className="mb-3 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="mb-3 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
             Changelogs that write themselves.
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400">
