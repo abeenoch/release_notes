@@ -1,9 +1,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def _ensure_utc(value):
+    """SQLite returns naive timestamps (stored as UTC). Attach UTC so the API
+    serializes them with an offset and browsers don't misread them as local."""
+    if isinstance(value, datetime) and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 
@@ -33,6 +41,11 @@ class LlmConfigResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _utc(cls, v):
+        return _ensure_utc(v)
+
 
 
 class ChangelogTriggerRequest(BaseModel):
@@ -59,6 +72,11 @@ class ChangelogResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _utc(cls, v):
+        return _ensure_utc(v)
 
 
 class ChangelogListResponse(BaseModel):
