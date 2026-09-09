@@ -4,6 +4,7 @@ import { configApi } from '../lib'
 import type { LlmConfig } from '../lib'
 import { BrandIcon } from '../components/BrandIcon'
 import { ConfirmButton } from '../components/ConfirmButton'
+import { ProviderDropdown } from '../components/ProviderDropdown'
 
 const PROVIDERS = [
   { id: 'commit', label: 'Commit Parser (no LLM)', needsKey: false },
@@ -116,14 +117,11 @@ export function ConfigPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls}>Provider</label>
-            <div className="flex items-center gap-2">
-              <select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputCls}>
-                {PROVIDERS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
-              <BrandIcon provider={provider} size={18} />
-            </div>
+            <ProviderDropdown
+              value={provider}
+              options={PROVIDERS}
+              onChange={(id) => setProvider(id)}
+            />
           </div>
           <div>
             <label className={labelCls}>

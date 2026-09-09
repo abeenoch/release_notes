@@ -4,6 +4,12 @@ import { notifyApi } from '../lib'
 import type { NotifyConfig } from '../lib'
 import { BrandIcon } from '../components/BrandIcon'
 import { ConfirmButton } from '../components/ConfirmButton'
+import { ProviderDropdown } from '../components/ProviderDropdown'
+
+const NOTIFY_PROVIDERS = [
+  { id: 'smtp', label: 'Email (SMTP)' },
+  { id: 'slack', label: 'Slack' },
+]
 
 export function NotificationsPage() {
   const [configs, setConfigs] = useState<NotifyConfig[]>([])
@@ -134,13 +140,11 @@ export function NotificationsPage() {
       <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 max-w-xs">
           <label className={labelCls}>Provider</label>
-          <div className="flex items-center gap-2">
-            <select value={provider} onChange={(e) => setProvider(e.target.value)} className={inputCls}>
-              <option value="smtp">Email (SMTP)</option>
-              <option value="slack">Slack</option>
-            </select>
-            <BrandIcon provider={provider} size={18} />
-          </div>
+          <ProviderDropdown
+            value={provider}
+            options={NOTIFY_PROVIDERS}
+            onChange={(id) => setProvider(id)}
+          />
         </div>
 
         {provider === 'smtp' ? (
