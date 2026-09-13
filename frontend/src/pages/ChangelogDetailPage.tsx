@@ -73,7 +73,18 @@ export function ChangelogDetailPage() {
     }
   }, [changelogId])
 
-  useEffect(() => { load() }, [load])
+  // Re-run when the changelog settles, so polling stops at a terminal state.
+  const settled = changelog?.status === 'completed' || changelog?.status === 'failed'
+
+  useEffect(() => {
+    if (settled) return
+    load()
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      load()
+    }, 3000)
+    return () => clearInterval(id)
+  }, [load, settled])
 
   const copy = async () => {
     if (!changelog?.raw_markdown) return

@@ -1,29 +1,50 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { GitBranch, FileText, Settings, Loader2 } from 'lucide-react'
 import { authApi, reposApi, changelogApi, configApi } from '../lib'
 import { StatusBadge, RelativeDate } from '../components/StatusBadge'
 import type { Changelog, Repository } from '../lib'
 
+const POLL_MS = 5000
+
 export function DashboardPage() {
   const [repos, setRepos] = useState<Repository[]>([])
   const [changelogs, setChangelogs] = useState<Changelog[]>([])
   const [hasLlm, setHasLlm] = useState(false)
   const [loading, setLoading] = useState(true)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => {
-    Promise.all([
-      authApi.me().catch(() => null),
-      reposApi.list().catch(() => ({ repos: [] })),
-      changelogApi.list().catch(() => ({ changelogs: [] })),
-      configApi.listLlms().catch(() => []),
-    ]).then(([_, r, c, l]) => {
+  const load = useCallback(async () => {
+    try {
+      const [_, r, c, l] = await Promise.all([
+        authApi.me().catch(() => null),
+        reposApi.list().catch(() => ({ repos: [] })),
+        changelogApi.list().catch(() => ({ changelogs: [] })),
+        configApi.listLlms().catch(() => []),
+      ])
       setRepos(r?.repos ?? [])
       setChangelogs(c?.changelogs ?? [])
       setHasLlm((l ?? []).some((x) => x.is_active))
+    } catch {
+      /* keep last good state on transient failures */
+    } finally {
       setLoading(false)
-    })
+    }
   }, [])
+
+  useEffect(() => {
+    load()
+    // Live updates: a webhook-created changelog appears without reload.
+    // Polling is cheap (one small JSON list) and pauses when tab hidden.
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return
+      load()
+    }
+    pollRef.current = setInterval(tick, POLL_MS)
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [load])
 
   if (loading) {
     return (
