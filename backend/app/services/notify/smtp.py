@@ -52,16 +52,15 @@ class SmtpProvider(NotifyProviderInterface):
         body: str,
         html_body: str | None = None,
     ) -> None:
-        html = html_body or _md_to_html(body)
+        # html_body from email_template.py is already a full HTML document —
+        # use it as-is. Only the markdown fallback needs the wrapper.
+        html = html_body if html_body else f'<div style="font-family: sans-serif;">{_md_to_html(body)}</div>'
         msg = EmailMessage()
         msg["From"] = from_addr
         msg["To"] = to_addr
         msg["Subject"] = subject
         msg.set_content(body)
-        msg.add_alternative(
-            f'<div style="font-family: sans-serif;">{html}</div>',
-            subtype="html",
-        )
+        msg.add_alternative(html, subtype="html")
         use_tls = self.port == 465 or self.secure
         await aiosmtplib.send(
             msg,

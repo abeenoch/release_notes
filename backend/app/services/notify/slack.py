@@ -24,6 +24,7 @@ class SlackProvider(NotifyProviderInterface):
         to_addr: str = "",
         subject: str = "",
         body: str = "",
+        html_body: str | None = None,
     ) -> None:
         # Build a Slack Block Kit message
         blocks: list[dict] = [

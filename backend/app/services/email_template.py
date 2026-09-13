@@ -18,6 +18,42 @@ def _inline(s: str) -> str:
     return s
 
 
+def _strip_duplicate_title(lines: list[str]) -> list[str]:
+    """Drop a leading '# Changelog …' heading — the template header already
+    renders the subject as its H1, so keeping the markdown H1 duplicates
+    'Changelog — <version>' in every mail."""
+    out = list(lines)
+    for i, line in enumerate(out):
+        if not line.strip():
+            continue
+        if re.match(r"^#\s+Changelog\b", line.strip(), flags=re.IGNORECASE):
+            return out[i + 1 :]
+        return out
+    return out
+
+
+# Inline, email-safe copy of frontend/public/favicon.svg (the Release Notes
+# document icon). Referencing /favicon.svg by URL won't load in mail clients,
+# so the SVG is inlined.
+_LOGO_SVG = (
+    '<svg width="32" height="32" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" '
+    'role="img" aria-label="Release Notes" style="display:block;">'
+    '<defs><linearGradient id="rn-grad" x1="0" y1="0" x2="1" y2="1">'
+    '<stop offset="0" stop-color="#f59e0b"/>'
+    '<stop offset="1" stop-color="#d97706"/>'
+    "</linearGradient></defs>"
+    '<rect width="64" height="64" rx="15" fill="url(#rn-grad)"/>'
+    '<g fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" '
+    'stroke-linejoin="round" transform="translate(10 10) scale(1.9)">'
+    '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>'
+    '<polyline points="14 2 14 8 20 8"/>'
+    '<line x1="16" y1="13" x2="8" y2="13"/>'
+    '<line x1="16" y1="17" x2="8" y2="17"/>'
+    '<line x1="10" y1="9" x2="8" y2="9"/>'
+    "</g></svg>"
+)
+
+
 def changelog_email_html(
     subject: str,
     markdown: str,
@@ -25,7 +61,7 @@ def changelog_email_html(
     release_url: str | None = None,
 ) -> str:
     """Render a changelog markdown blob into a branded, email-safe HTML template."""
-    lines = markdown.split("\n")
+    lines = _strip_duplicate_title(markdown.split("\n"))
     body: list[str] = []
     in_list = False
     in_code = False
@@ -116,8 +152,10 @@ def changelog_email_html(
       <td style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:20px 24px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
           <td style="vertical-align:middle;">
-            <span style="display:inline-block;width:32px;height:32px;line-height:32px;text-align:center;border-radius:8px;background:rgba(0,0,0,0.25);color:#fff;font-weight:700;">R</span>
-            <span style="color:#fff;font-weight:700;font-size:16px;margin-left:10px;vertical-align:middle;">Release Notes</span>
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td style="vertical-align:middle;width:32px;">{_LOGO_SVG}</td>
+              <td style="vertical-align:middle;color:#fff;font-weight:700;font-size:16px;padding-left:10px;">Release Notes</td>
+            </tr></table>
           </td>
           <td style="text-align:right;color:rgba(255,255,255,0.9);font-size:12px;">{ _html.escape(repo_name or '') }</td>
         </tr></table>

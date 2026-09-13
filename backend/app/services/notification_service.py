@@ -51,9 +51,17 @@ class NotificationService:
         )
 
     def build_subject(self, cfg: UserNotifyConfig, changelog: ChangelogModel) -> str:
-        prefix = cfg.subject_prefix or "[Changelog]"
+        prefix = (cfg.subject_prefix or "[Changelog]").strip()
         version = changelog.version or changelog.to_tag or "release"
         return f"{prefix} {version}".strip()
+
+    def build_html_subject(self, cfg: UserNotifyConfig, subject: str) -> str:
+        """Body H1 without the redundant prefix — the template eyebrow already
+        says 'Changelog', so '[Changelog] v1.2.3' would read twice."""
+        prefix = (cfg.subject_prefix or "[Changelog]").strip()
+        if prefix and subject.startswith(prefix):
+            return subject[len(prefix):].strip(" -–—:[]()")
+        return subject
 
     async def send_changelog(
         self, cfg: UserNotifyConfig, changelog: ChangelogModel
@@ -68,8 +76,9 @@ class NotificationService:
         """
         body = changelog.raw_markdown or "*No changelog content.*"
         subject = self.build_subject(cfg, changelog)
+        html_subject = self.build_html_subject(cfg, subject)
         html_body = changelog_email_html(
-            subject=subject.replace(cfg.subject_prefix or "[Changelog]", "").strip() or subject,
+            subject=html_subject or subject,
             markdown=body,
         )
 

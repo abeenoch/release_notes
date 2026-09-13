@@ -41,15 +41,14 @@ class SendGridProvider(NotifyProviderInterface):
         body: str,
         html_body: str | None = None,
     ) -> None:
-        html = html_body or _md_to_html(body)
+        # html_body from email_template.py is already a full HTML document —
+        # use it as-is. Only the markdown fallback needs the wrapper.
+        html = html_body if html_body else f'<div style="font-family: sans-serif;">{_md_to_html(body)}</div>'
         message = Mail(
             from_email=from_addr,
             to_emails=to_addr,
             subject=subject,
-            html_content=Content(
-                "text/html",
-                f'<div style="font-family: sans-serif;">{html}</div>',
-            ),
+            html_content=Content("text/html", html),
         )
         # SendGrid's client.send is synchronous — don't await it
         response = self.client.send(message)  # type: ignore[call-overload]
