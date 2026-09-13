@@ -67,14 +67,11 @@ export const changelogApi = {
   get: (id: string) => request<Changelog>('GET', `/changelogs/${id}`),
 }
 
-// Backend actions added for publishing + changelog maintenance
+// Backend actions added for publishing
 export const publishApi = {
   publishRelease: (changelogId: string) =>
     request<{ release_url?: string; tag?: string }>(
       'POST', `/changelogs/${changelogId}/publish-release`),
-  commitChangelog: (changelogId: string) =>
-    request<{ commit_sha?: string; branch?: string; file?: string }>(
-      'POST', `/changelogs/${changelogId}/commit-changelog`),
 }
 
 export const configApi = {

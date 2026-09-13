@@ -129,54 +129,6 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
-    async def get_or_create_file_commit(
-        self,
-        token: str,
-        full_name: str,
-        branch: str,
-        path: str,
-        content: str,
-        commit_message: str,
-    ) -> dict[str, Any]:
-        """
-        Create or update a file on a branch via the Contents API and commit it.
-
-        Handles the "file already exists" case by fetching the existing blob
-        SHA first. Returns the GitHub API commit response.
-        """
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github.v3+json",
-        }
-        encoded = content.encode("utf-8")
-        import base64
-
-        b64 = base64.b64encode(encoded).decode("ascii")
-        async with httpx.AsyncClient() as client:
-            # Does the file already exist on this branch?
-            sha: str | None = None
-            existing = await client.get(
-                f"{GITHUB_API_BASE}/repos/{full_name}/contents/{path}",
-                headers=headers,
-                params={"ref": branch},
-            )
-            if existing.status_code == 200:
-                sha = existing.json().get("sha")
-            body: dict[str, Any] = {
-                "message": commit_message,
-                "content": b64,
-                "branch": branch,
-            }
-            if sha:
-                body["sha"] = sha
-            response = await client.put(
-                f"{GITHUB_API_BASE}/repos/{full_name}/contents/{path}",
-                headers=headers,
-                json=body,
-            )
-            response.raise_for_status()
-            return response.json()
-
         """Get all installations of the GitHub App (uses app JWT)."""
         async with httpx.AsyncClient() as client:
             response = await client.get(

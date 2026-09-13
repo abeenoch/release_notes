@@ -155,7 +155,7 @@ async def delete_llm_config(
     await db.delete(config)
     return None
 
-# ── Publishing: GitHub Release + CHANGELOG.md commit ──
+# ── Publishing: GitHub Release ──
 
 
 async def _load_changelog_and_repo(
@@ -198,23 +198,6 @@ async def publish_github_release(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)[:500])
     return result
 
-
-@router.post("/{changelog_id}/commit-changelog")
-async def commit_changelog_file(
-    changelog_id: str,
-    user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
-):
-    """Create or update CHANGELOG.md in the target repository."""
-    changelog, repo = await _load_changelog_and_repo(changelog_id, user_id, db)
-    try:
-        result = await publish_service.commit_changelog_file(changelog, repo, db)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:
-        logger.exception("CHANGELOG.md commit failed for changelog %s", changelog_id)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)[:500])
-    return result
 
 # ── Changelog Generation ──
 

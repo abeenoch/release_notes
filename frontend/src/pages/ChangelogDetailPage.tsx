@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Copy, Check, Download, Github,
-  FileUp, ExternalLink, AlertTriangle,
+  ExternalLink, AlertTriangle,
 } from 'lucide-react'
 import { changelogApi, publishApi } from '../lib'
 import { StatusBadge, RelativeDate } from '../components/StatusBadge'
@@ -58,9 +58,7 @@ export function ChangelogDetailPage() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [committing, setCommitting] = useState(false)
   const [releaseUrl, setReleaseUrl] = useState<string | null>(null)
-  const [commitSha, setCommitSha] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
 
   const load = useCallback(async () => {
@@ -119,21 +117,6 @@ export function ChangelogDetailPage() {
       setActionError((e as Error).message)
     } finally {
       setPublishing(false)
-    }
-  }
-
-  const commitChangelogFile = async () => {
-    if (!changelogId) return
-    setCommitting(true)
-    setActionError('')
-    try {
-      const res = await publishApi.commitChangelog(changelogId)
-      if (res?.commit_sha) setCommitSha(res.commit_sha)
-      await load()
-    } catch (e) {
-      setActionError((e as Error).message)
-    } finally {
-      setCommitting(false)
     }
   }
 
@@ -207,10 +190,6 @@ export function ChangelogDetailPage() {
             {publishing ? <Loader2 size={16} className="animate-spin" /> : <Github size={16} />}
             Publish as GitHub Release
           </button>
-          <button onClick={commitChangelogFile} disabled={committing} className={`${btnBase} bg-brand-600 text-white hover:bg-brand-700`}>
-            {committing ? <Loader2 size={16} className="animate-spin" /> : <FileUp size={16} />}
-            Commit CHANGELOG.md
-          </button>
           {releaseUrl && (
             <a href={releaseUrl} target="_blank" rel="noopener"
               className={`${btnBase} text-emerald-600 hover:underline dark:text-emerald-400`}>
@@ -221,12 +200,6 @@ export function ChangelogDetailPage() {
       )}
 
       {actionError && <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p>}
-
-      {commitSha && (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          CHANGELOG.md committed as <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800">{commitSha.slice(0, 7)}</code>
-        </p>
-      )}
 
       {isCompleted && changelog.raw_markdown && (
         <article className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
