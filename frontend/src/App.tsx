@@ -129,18 +129,35 @@ function SidebarLayout() {
 }
 
 function RequireAuth() {
-  const [validated, setValidated] = useState(false)
+  // 'checking' → validating the stored JWT with /auth/me
+  // 'ok'       → valid session, render the app
+  // 'failed'   → no/invalid token, go to login
+  const [status, setStatus] = useState<'checking' | 'ok' | 'failed'>('checking')
 
   useEffect(() => {
     let cancelled = false
+    if (!hasToken()) {
+      setStatus('failed')
+      return
+    }
     authApi
       .me()
-      .then(() => { if (!cancelled) setValidated(true) })
-      .catch(() => { /* request() already clears the token on 401 */ })
+      .then(() => { if (!cancelled) setStatus('ok') })
+      .catch(() => { /* request() already clears the token on 401 */ if (!cancelled) setStatus('failed') })
     return () => { cancelled = true }
   }, [])
 
-  if (!hasToken() || !validated) return <Navigate to="/login" replace />
+  if (status === 'failed') return <Navigate to="/login" replace />
+  if (status === 'checking') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex flex-col items-center gap-3 text-zinc-500 dark:text-zinc-400">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+          <span className="text-sm">Loading your workspace…</span>
+        </div>
+      </div>
+    )
+  }
   return <SidebarLayout />
 }
 
