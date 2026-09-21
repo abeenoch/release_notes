@@ -7,34 +7,54 @@ import { ThemeToggle } from '../components/ThemeToggle'
 const CLIENT_ID = 'Ov23ligbTLjZzb1vZuMr'
 const SCOPES = 'repo,user:email'
 
+function makeState(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 function startOAuth() {
-  const redirectUri = window.location.origin + '/'
+  const state = makeState()
+  sessionStorage.setItem('arn_oauth_state', state)
+  const redirectUri = window.location.origin + '/login'
   window.location.href =
     'https://github.com/login/oauth/authorize'
     + `?client_id=${encodeURIComponent(CLIENT_ID)}`
     + `&redirect_uri=${encodeURIComponent(redirectUri)}`
     + `&scope=${encodeURIComponent(SCOPES)}`
+    + `&state=${encodeURIComponent(state)}`
 }
 
 export function LoginPage() {
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     if (!code) return
+
+    // CSRF protection: verify the OAuth state we set before redirecting.
+    const expectedState = sessionStorage.getItem('arn_oauth_state')
+    const returnedState = params.get('state')
+    sessionStorage.removeItem('arn_oauth_state')
+    if (expectedState && returnedState !== expectedState) {
+      setError('Sign-in session expired or invalid. Please try again.')
+      window.history.replaceState({}, '', '/login')
+      return
+    }
+
     setBusy(true)
     authApi
       .loginWithGitHub(code)
       .then(({ access_token }) => {
         setToken(access_token)
-        window.history.replaceState({}, '', '/')
+        window.history.replaceState({}, '', '/login')
         navigate('/repos', { replace: true })
       })
       .catch((err) => {
-        alert(`Sign-in failed: ${err.message}`)
-        window.history.replaceState({}, '', '/')
+        setError(`Sign-in failed: ${err.message}`)
+        window.history.replaceState({}, '', '/login')
       })
       .finally(() => setBusy(false))
   }, [navigate])
@@ -67,6 +87,11 @@ export function LoginPage() {
           </button>
           <ThemeToggle />
         </div>
+        {error && (
+          <p role="alert" className="mt-4 max-w-md rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
+            {error}
+          </p>
+        )}
       </div>
       <div className="hidden flex-1 items-center justify-center bg-gradient-to-br from-brand-600/10 via-transparent to-brand-500/10 lg:flex">
         <div className="max-w-sm text-center">

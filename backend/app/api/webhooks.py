@@ -51,8 +51,32 @@ async def _queue_changelog_for_tag(
     repo = result.scalar_one_or_none()
     if not repo or not repo.is_active:
         return {"status": "ignored", "message": f"Repository {full_name} not registered or inactive"}
-    if not repo.is_active:
-        return {"status": "ignored", "message": f"Repository {full_name} is inactive"}
+
+    # Idempotency: GitHub retries webhook deliveries. Don't queue a duplicate
+    # generation for the same tag while one is already pending/processing
+    # (or already completed for this exact tag).
+    existing = await db.execute(
+        select(ChangelogModel)
+        .where(
+            ChangelogModel.repo_id == repo.id,
+            ChangelogModel.to_tag == tag_name,
+        )
+        .order_by(ChangelogModel.created_at.desc())
+    )
+    duplicate = existing.scalars().first()
+    if duplicate:
+        if duplicate.status in ("pending", "processing"):
+            return {
+                "status": "ignored",
+                "message": f"Changelog for {tag_name} already {duplicate.status}",
+                "changelog_id": duplicate.id,
+            }
+        if duplicate.status == "completed":
+            return {
+                "status": "ignored",
+                "message": f"Changelog for {tag_name} already completed",
+                "changelog_id": duplicate.id,
+            }
 
     result = await db.execute(select(User).where(User.id == repo.user_id))
     user = result.scalar_one_or_none()

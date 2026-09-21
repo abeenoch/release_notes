@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -8,7 +9,7 @@ import {
   useNavigate,
 } from 'react-router-dom'
 import { Settings, LayoutDashboard, GitBranch, Bell, LogOut, FileText } from 'lucide-react'
-import { setToken, hasToken } from './lib'
+import { setToken, hasToken, authApi } from './lib'
 import { ThemeToggle } from './components/ThemeToggle'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -128,7 +129,18 @@ function SidebarLayout() {
 }
 
 function RequireAuth() {
-  if (!hasToken()) return <Navigate to="/login" replace />
+  const [validated, setValidated] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    authApi
+      .me()
+      .then(() => { if (!cancelled) setValidated(true) })
+      .catch(() => { /* request() already clears the token on 401 */ })
+    return () => { cancelled = true }
+  }, [])
+
+  if (!hasToken() || !validated) return <Navigate to="/login" replace />
   return <SidebarLayout />
 }
 

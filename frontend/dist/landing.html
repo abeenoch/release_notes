@@ -8,6 +8,12 @@
       location.replace('/repos');
       return;
     }
+    // Mid-OAuth visit (GitHub redirected here with ?code=): hand off to the
+    // app's login page immediately so the cinematic page never flashes.
+    var params = new URLSearchParams(location.search);
+    if (params.get('code')) {
+      location.replace('/login' + location.search + location.hash);
+    }
   })();
   </script>
   <meta charset="UTF-8" />
@@ -353,25 +359,17 @@
 
     // ── OAuth flow ──────────────────────────────────────────
     function startOAuth() {
+      var state = '';
+      var bytes = new Uint8Array(16);
+      (window.crypto || window.msCrypto).getRandomValues(bytes);
+      for (var i = 0; i < bytes.length; i++) state += ('0' + bytes[i].toString(16)).slice(-2);
+      try { sessionStorage.setItem('arn_oauth_state', state); } catch (e) { /* private mode */ }
       var url = 'https://github.com/login/oauth/authorize'
         + '?client_id=' + encodeURIComponent(CLIENT_ID)
-        + '&redirect_uri=' + encodeURIComponent(window.location.origin + '/')
-        + '&scope=' + encodeURIComponent(SCOPES);
+        + '&redirect_uri=' + encodeURIComponent(window.location.origin + '/login')
+        + '&scope=' + encodeURIComponent(SCOPES)
+        + '&state=' + encodeURIComponent(state);
       window.location.href = url;
-    }
-
-    async function exchangeCode(code) {
-      var res = await fetch('/api/auth/github', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code })
-      });
-      if (!res.ok) {
-        var data = await res.json().catch(function() { return {}; });
-        throw new Error(data.detail || 'Authentication failed');
-      }
-      var data = await res.json();
-      localStorage.setItem('arn_token', data.access_token);
     }
 
     // ── Star count (best-effort) ────────────────────────────
@@ -396,27 +394,10 @@
     }
 
     // ── Init ────────────────────────────────────────────────
-    (async function() {
-      var params = new URLSearchParams(window.location.search);
-      var code = params.get('code');
-
-      // Kick off star count fetch (don't block init)
+    (function() {
+      // OAuth callbacks are handled by the app's /login route — the blocking
+      // script above bounces any ?code= visit there before we render.
       loadStarCount();
-
-      // Just returned from GitHub OAuth → exchange code
-      if (code) {
-        try {
-          await exchangeCode(code);
-          window.history.replaceState({}, '', '/');
-          window.location.replace('/repos');
-          return;
-        } catch (err) {
-          alert('Sign-in failed: ' + err.message);
-          window.history.replaceState({}, '', '/');
-        }
-      }
-
-      // Not authenticated → show cinematic experience
       initEmbers();
     })();
 

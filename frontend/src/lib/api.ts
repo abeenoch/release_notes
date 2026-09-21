@@ -32,6 +32,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 204) return undefined as T
   const data = await res.json().catch(() => null)
   if (!res.ok) {
+    // Expired/invalid session → clear it and go back to the login page,
+    // instead of leaving the user on a screen where every call fails.
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+      setToken(null)
+      window.location.href = '/login'
+    }
     throw new Error((data?.detail as string) || data?.message || 'Request failed')
   }
   return data as T
