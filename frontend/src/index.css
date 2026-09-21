@@ -38,6 +38,7 @@ body {
   line-height: 1.7;
   font-size: 0.95rem;
   color: #3f3f46;
+  overflow-wrap: break-word; /* long commit SHAs / URLs must wrap on mobile */
 }
 .dark .markdown-body { color: #d4d4d8; }
 .markdown-body h1,

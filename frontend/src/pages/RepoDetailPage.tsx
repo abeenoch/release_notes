@@ -70,14 +70,14 @@ export function RepoDetailPage() {
         >
           <ArrowLeft size={18} />
         </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{repoName}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{repoName}</h1>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{changelogs.length} changelogs</p>
         </div>
         <button
           onClick={generate}
           disabled={generating}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           <Sparkles size={16} className={generating ? 'animate-pulse' : ''} />
           {generating ? 'Queuing…' : 'Generate Now'}

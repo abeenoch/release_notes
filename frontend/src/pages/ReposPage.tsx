@@ -72,7 +72,7 @@ export function ReposPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Repositories</h1>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
@@ -82,7 +82,7 @@ export function ReposPage() {
         <button
           onClick={openPreview}
           disabled={previewing}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           <RefreshCw size={16} className={previewing ? 'animate-pulse' : ''} />
           {previewing ? 'Fetching…' : 'Sync from GitHub'}

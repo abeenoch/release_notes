@@ -213,7 +213,7 @@ export function ChangelogDetailPage() {
       {actionError && <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p>}
 
       {isCompleted && changelog.raw_markdown && (
-        <article className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <article className="overflow-x-auto rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
           <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(changelog.raw_markdown) }} />
         </article>
       )}
