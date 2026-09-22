@@ -10,21 +10,30 @@ const POLL_MS = 5000
 export function DashboardPage() {
   const [repos, setRepos] = useState<Repository[]>([])
   const [changelogs, setChangelogs] = useState<Changelog[]>([])
+  // Full totals from /stats/summary — the list endpoint is paginated, so the
+  // page length must never stand in for the real count.
+  const [totalChangelogs, setTotalChangelogs] = useState<number | null>(null)
+  const [publishedCount, setPublishedCount] = useState<number | null>(null)
   const [hasLlm, setHasLlm] = useState(false)
   const [loading, setLoading] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [_, r, c, l] = await Promise.all([
+      const [_, r, c, l, s] = await Promise.all([
         authApi.me().catch(() => null),
         reposApi.list().catch(() => ({ repos: [] })),
         changelogApi.list().catch(() => ({ changelogs: [] })),
         configApi.listLlms().catch(() => []),
+        changelogApi.stats().catch(() => null),
       ])
       setRepos(r?.repos ?? [])
       setChangelogs(c?.changelogs ?? [])
       setHasLlm((l ?? []).some((x) => x.is_active))
+      if (s) {
+        setTotalChangelogs(s.changelogs_total)
+        setPublishedCount(s.changelogs_published)
+      }
     } catch {
       /* keep last good state on transient failures */
     } finally {
@@ -57,7 +66,7 @@ export function DashboardPage() {
   const activeRepos = repos.filter((r) => r.is_active)
   const stats = [
     { label: 'Repositories', value: activeRepos.length, icon: GitBranch },
-    { label: 'Changelogs', value: changelogs.length, icon: FileText },
+    { label: 'Changelogs', value: totalChangelogs ?? changelogs.length, icon: FileText },
     { label: 'LLM Connected', value: hasLlm ? 'Yes' : 'No', icon: Settings },
   ]
 
@@ -87,7 +96,12 @@ export function DashboardPage() {
       <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <h2 className="font-medium text-zinc-900 dark:text-zinc-50">Recent changelogs</h2>
-          <Link to="/repos" className="text-sm text-brand-600 hover:underline dark:text-brand-400">View repos</Link>
+          <div className="flex items-center gap-3 text-sm">
+            {publishedCount != null && publishedCount > 0 && (
+              <span className="text-zinc-500 dark:text-zinc-400">{publishedCount} published</span>
+            )}
+            <Link to="/repos" className="text-brand-600 hover:underline dark:text-brand-400">View repos</Link>
+          </div>
         </div>
         {changelogs.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">No changelogs yet.</p>

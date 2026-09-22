@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
@@ -13,6 +13,7 @@ from app.models.changelog import Changelog as ChangelogModel
 from app.schemas.changelog import (
     LlmConfigCreate, LlmConfigResponse, LlmConfigUpdate,
     ChangelogTriggerRequest, ChangelogResponse, ChangelogListResponse,
+    ChangelogStatsResponse,
 )
 from app.services.changelog_service import ChangelogService
 from app.services import publish_service
@@ -292,6 +293,12 @@ async def list_changelogs(
     query = query.order_by(ChangelogModel.created_at.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
     changelogs = result.scalars().all()
+    count_q = select(func.count()).select_from(ChangelogModel).where(
+        ChangelogModel.user_id == user_id
+    )
+    if repo_id:
+        count_q = count_q.where(ChangelogModel.repo_id == repo_id)
+    total = (await db.execute(count_q)).scalar_one()
     return ChangelogListResponse(changelogs=[
         ChangelogResponse(
             id=c.id, repo_id=c.repo_id,
@@ -305,7 +312,37 @@ async def list_changelogs(
             created_at=c.created_at,
         )
         for c in changelogs
-    ])
+    ], total=total)
+
+
+@router.get("/stats/summary", response_model=ChangelogStatsResponse)
+async def changelog_stats(
+    repo_id: str | None = None,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dashboard counts. Full totals — never the length of a paginated page."""
+    base = [ChangelogModel.user_id == user_id]
+    if repo_id:
+        base.append(ChangelogModel.repo_id == repo_id)
+    total = (await db.execute(
+        select(func.count()).select_from(ChangelogModel).where(*base)
+    )).scalar_one()
+    completed = (await db.execute(
+        select(func.count()).select_from(ChangelogModel).where(*base, ChangelogModel.status == "completed")
+    )).scalar_one()
+    failed = (await db.execute(
+        select(func.count()).select_from(ChangelogModel).where(*base, ChangelogModel.status == "failed")
+    )).scalar_one()
+    published = (await db.execute(
+        select(func.count()).select_from(ChangelogModel).where(*base, ChangelogModel.release_url.is_not(None))
+    )).scalar_one()
+    return ChangelogStatsResponse(
+        changelogs_total=total,
+        changelogs_completed=completed,
+        changelogs_failed=failed,
+        changelogs_published=published,
+    )
 
 
 @router.get("/{changelog_id}", response_model=ChangelogResponse)

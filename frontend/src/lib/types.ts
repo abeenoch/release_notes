@@ -47,6 +47,8 @@ export interface Changelog {
 
 export interface ChangelogListResponse {
   changelogs: Changelog[]
+  /** Full count ignoring limit/offset — stats read this, not the page length. */
+  total: number
 }
 
 export interface LlmConfig {

@@ -76,6 +76,13 @@ export const changelogApi = {
     return request<ChangelogListResponse>('GET', `/changelogs/?${params.toString()}`)
   },
   get: (id: string) => request<Changelog>('GET', `/changelogs/${id}`),
+  stats: (repoId?: string) => {
+    const params = new URLSearchParams()
+    if (repoId) params.set('repo_id', repoId)
+    const q = params.toString()
+    return request<{ changelogs_total: number; changelogs_completed: number; changelogs_failed: number; changelogs_published: number }>(
+      'GET', `/changelogs/stats/summary${q ? `?${q}` : ''}`)
+  },
 }
 
 // Backend actions added for publishing

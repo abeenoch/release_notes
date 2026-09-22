@@ -83,6 +83,57 @@ def _fake_token(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_stats_reports_full_totals_not_page_length(db, monkeypatch):
+    """Dashboard counts must survive past the list default limit of 50."""
+    from app.api.changelogs import changelog_stats, list_changelogs
+
+    user = User(github_id="stats", github_login="counter")
+    db.add(user)
+    await db.flush()
+    repo = Repository(user_id=user.id, full_name="octocat/stats", default_branch="main")
+    db.add(repo)
+    await db.flush()
+    for i in range(55):
+        db.add(Changelog(
+            user_id=user.id, repo_id=repo.id, to_tag=f"v{i}", status="completed",
+            release_url=f"https://x/{i}" if i % 2 == 0 else None,
+        ))
+    await db.commit()
+
+    stats = await changelog_stats(repo_id=None, user_id=user.id, db=db)
+    assert stats.changelogs_total == 55
+    assert stats.changelogs_completed == 55
+    assert stats.changelogs_failed == 0
+    assert stats.changelogs_published == 28
+
+    page = await list_changelogs(repo_id=None, limit=50, offset=0, user_id=user.id, db=db)
+    assert len(page.changelogs) == 50          # page caps at the limit...
+    assert page.total == 55                     # ...but the total tells the truth
+    assert page.total == stats.changelogs_total
+
+
+@pytest.mark.asyncio
+async def test_stats_scopes_to_repo(db, monkeypatch):
+    user = User(github_id="stats2", github_login="counter2")
+    db.add(user)
+    await db.flush()
+    repos = []
+    for name in ("octocat/a", "octocat/b"):
+        repo = Repository(user_id=user.id, full_name=name, default_branch="main")
+        db.add(repo)
+        await db.flush()
+        repos.append(repo)
+    db.add(Changelog(user_id=user.id, repo_id=repos[0].id, to_tag="v1", status="completed"))
+    db.add(Changelog(user_id=user.id, repo_id=repos[1].id, to_tag="v1", status="completed"))
+    db.add(Changelog(user_id=user.id, repo_id=repos[1].id, to_tag="v2", status="failed"))
+    await db.commit()
+
+    from app.api.changelogs import changelog_stats
+    scoped = await changelog_stats(repo_id=repos[1].id, user_id=user.id, db=db)
+    assert (scoped.changelogs_total, scoped.changelogs_completed, scoped.changelogs_failed) == (2, 1, 1)
+
+
+@pytest.mark.asyncio
 async def test_second_publish_reports_already_published_without_touching_github(db, monkeypatch):
     """The accidental double-click: no create call, no overwrite, friendly status."""
     _, repo, changelog = await _seed(

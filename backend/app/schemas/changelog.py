@@ -89,3 +89,12 @@ class ChangelogResponse(BaseModel):
 
 class ChangelogListResponse(BaseModel):
     changelogs: list[ChangelogResponse]
+    total: int  # full count ignoring limit/offset (stats read this, not len())
+
+
+class ChangelogStatsResponse(BaseModel):
+    """Dashboard counts — always full totals, never a page length."""
+    changelogs_total: int
+    changelogs_completed: int
+    changelogs_failed: int
+    changelogs_published: int
