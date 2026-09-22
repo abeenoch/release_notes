@@ -43,6 +43,16 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
+    async def get_user_emails(self, token: str) -> list[dict]:
+        """List the user's verified emails (fallback when /user hides email)."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/user/emails",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            response.raise_for_status()
+            return response.json()
+
     async def get_user_repos(self, token: str) -> list[dict[str, Any]]:
         """List repos the user has access to."""
         repos: list[dict[str, Any]] = []
@@ -97,6 +107,32 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
+    async def delete_webhook(
+        self, token: str, full_name: str, webhook_url: str
+    ) -> bool:
+        """Delete our webhook from a repo (best-effort, matches by URL).
+
+        Returns True if a matching hook was deleted.
+        """
+        async with httpx.AsyncClient() as client:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.v3+json",
+            }
+            hooks_resp = await client.get(
+                f"{GITHUB_API_BASE}/repos/{full_name}/hooks", headers=headers
+            )
+            hooks_resp.raise_for_status()
+            for hook in hooks_resp.json():
+                if (hook.get("config") or {}).get("url") == webhook_url:
+                    del_resp = await client.delete(
+                        f"{GITHUB_API_BASE}/repos/{full_name}/hooks/{hook['id']}",
+                        headers=headers,
+                    )
+                    del_resp.raise_for_status()
+                    return True
+            return False
+
     async def create_release(
         self,
         token: str,
@@ -125,18 +161,6 @@ class GitHubClient:
                     "Accept": "application/vnd.github.v3+json",
                 },
                 json=payload,
-            )
-            response.raise_for_status()
-            return response.json()
-
-        """Get all installations of the GitHub App (uses app JWT)."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{GITHUB_API_BASE}/app/installations",
-                headers={
-                    "Authorization": f"Bearer {app_token}",
-                    "Accept": "application/vnd.github.v3+json",
-                },
             )
             response.raise_for_status()
             return response.json()

@@ -1,6 +1,9 @@
 export interface User {
   id: string
+  github_login?: string | null
+  /** @deprecated alias kept for older call sites */
   github_username?: string | null
+  display_name?: string | null
   avatar_url?: string | null
   email?: string | null
 }

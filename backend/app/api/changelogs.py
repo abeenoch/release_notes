@@ -53,6 +53,7 @@ async def create_llm_config(
         config = UserLlmConfig(user_id=user_id, provider="commit", is_active=True)
         db.add(config)
         await db.flush()
+        await db.commit()
         return LlmConfigResponse(
             id=config.id, provider="commit", is_active=True,
             has_api_key=False, created_at=config.created_at,
@@ -78,6 +79,7 @@ async def create_llm_config(
     )
     db.add(config)
     await db.flush()
+    await db.commit()
     return LlmConfigResponse(
         id=config.id, provider=config.provider, model=config.model,
         base_url=config.base_url, is_active=True,
@@ -130,6 +132,7 @@ async def update_llm_config(
 
     await db.flush()
     await db.refresh(config)
+    await db.commit()
     return LlmConfigResponse(
         id=config.id, provider=config.provider, model=config.model,
         base_url=config.base_url, is_active=config.is_active,
@@ -153,6 +156,7 @@ async def delete_llm_config(
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config not found")
     await db.delete(config)
+    await db.commit()
     return None
 
 # ── Publishing: GitHub Release ──
@@ -254,13 +258,17 @@ async def generate_changelog(
 @router.get("/", response_model=ChangelogListResponse)
 async def list_changelogs(
     repo_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
     query = select(ChangelogModel).where(ChangelogModel.user_id == user_id)
     if repo_id:
         query = query.where(ChangelogModel.repo_id == repo_id)
-    query = query.order_by(ChangelogModel.created_at.desc()).limit(50)
+    query = query.order_by(ChangelogModel.created_at.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
     changelogs = result.scalars().all()
     return ChangelogListResponse(changelogs=[

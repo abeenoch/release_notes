@@ -82,6 +82,7 @@ async def create_notify_config(
     )
     db.add(config)
     await db.flush()
+    await db.commit()
 
     return NotifyConfigResponse(
         id=config.id,
@@ -117,6 +118,8 @@ async def delete_notify_config(
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config not found")
+    await db.delete(config)
+    await db.commit()
 @router.patch("/configs/{config_id}", response_model=NotifyConfigResponse)
 async def update_notify_config(
     config_id: str,
@@ -184,6 +187,7 @@ async def update_notify_config(
         config.is_active = body.is_active
 
     await db.flush()
+    await db.commit()
     return NotifyConfigResponse(
         id=config.id,
         provider=config.provider,
@@ -201,4 +205,3 @@ async def update_notify_config(
         is_active=config.is_active,
         created_at=config.created_at,
     )
-    await db.delete(config)

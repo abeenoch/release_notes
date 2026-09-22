@@ -61,16 +61,31 @@ async def _ensure_sqlite_columns() -> None:
                         logger.info("Applied dev migration: added %s.%s", table, col)
                     except Exception as exc:  # column already exists etc.
                         logger.warning("Could not add %s.%s (%s)", table, col, exc)
+        # Backfill the (repo_id, to_tag) idempotency constraint: create the
+        # unique index if it doesn't exist (SQLite has no ADD CONSTRAINT).
+        # Duplicates from before the fix are left alone — newest wins on read.
+        try:
+            await conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_changelogs_repo_to_tag ON changelogs(repo_id, to_tag)"
+                )
+            )
+        except Exception as exc:
+            logger.warning("Could not create uq_changelogs_repo_to_tag index (%s)", exc)
 
 
 # FastAPI dependency
 
 async def get_db() -> AsyncSession:  # type: ignore[misc]
-    """FastAPI dependency — yields an async DB session."""
+    """FastAPI dependency — yields an async DB session.
+
+    Mutating handlers commit explicitly; this dependency only rolls back
+    on error so read-only GETs never issue stray commits.
+    """
     async with async_session_factory() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
             await session.rollback()
             raise
@@ -80,6 +95,6 @@ async def get_db() -> AsyncSession:  # type: ignore[misc]
 
 async def init_db() -> None:
     """Create all tables (idempotent — good for dev)."""
-    await _ensure_sqlite_columns()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _ensure_sqlite_columns()

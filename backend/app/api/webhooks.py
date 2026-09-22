@@ -7,6 +7,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -44,11 +45,18 @@ async def _queue_changelog_for_tag(
     full_name: str,
     tag_name: str,
 ) -> dict:
-    """Find the repo and queue a changelog generation."""
+    """Find the repo and queue a changelog generation.
+
+    Idempotency: GitHub retries webhook deliveries, and concurrent retries
+    can race past the pre-insert check. The (repo_id, to_tag) UNIQUE
+    constraint is the final guard — IntegrityError maps to "ignored".
+    """
     result = await db.execute(
-        select(Repository).where(Repository.full_name == full_name)
+        select(Repository)
+        .where(Repository.full_name == full_name)
+        .order_by(Repository.is_active.desc())
     )
-    repo = result.scalar_one_or_none()
+    repo = result.scalars().first()
     if not repo or not repo.is_active:
         return {"status": "ignored", "message": f"Repository {full_name} not registered or inactive"}
 
@@ -77,6 +85,19 @@ async def _queue_changelog_for_tag(
                 "message": f"Changelog for {tag_name} already completed",
                 "changelog_id": duplicate.id,
             }
+        if duplicate.status == "failed":
+            # Retry: reuse the same row (UNIQUE on repo_id+to_tag forbids a
+            # second row) — reset to pending and re-queue generation.
+            duplicate.status = "pending"
+            duplicate.error_message = None
+            await db.flush()
+            await db.commit()
+            background_tasks.add_task(run_changelog_generation, duplicate.id)
+            return {
+                "status": "queued",
+                "message": f"Changelog generation re-queued for {tag_name}",
+                "changelog_id": duplicate.id,
+            }
 
     result = await db.execute(select(User).where(User.id == repo.user_id))
     user = result.scalar_one_or_none()
@@ -90,7 +111,25 @@ async def _queue_changelog_for_tag(
         status="pending",
     )
     db.add(changelog)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Lost the race with a concurrent delivery for the same tag.
+        await db.rollback()
+        raced = await db.execute(
+            select(ChangelogModel)
+            .where(
+                ChangelogModel.repo_id == repo.id,
+                ChangelogModel.to_tag == tag_name,
+            )
+            .order_by(ChangelogModel.created_at.desc())
+        )
+        dup = raced.scalars().first()
+        return {
+            "status": "ignored",
+            "message": f"Changelog for {tag_name} already queued",
+            "changelog_id": dup.id if dup else None,
+        }
     await db.refresh(changelog)
     # Commit explicitly so the background task (which uses its own session)
     # can see this changelog record.
@@ -156,7 +195,12 @@ async def receive_webhook(
 
     # 2) Release published event
     if event == "release" and payload.get("action") == "published":
-        tag_name = payload.get("release", {}).get("tag_name") or "release"
+        tag_name = (
+            payload.get("release", {}).get("tag_name")
+            or payload.get("release", {}).get("target_commitish")
+            or (payload.get("repository", {}).get("pushed_at") and f"release-{payload['repository']['pushed_at']}")
+            or f"release-{request.headers.get('x-github-delivery', 'unknown')}"
+        )
         return await _queue_changelog_for_tag(db, background_tasks, full_name, tag_name)
 
     # 3) Push event to default branch
@@ -178,8 +222,11 @@ async def receive_webhook(
                 "message": f"Push to {ref} (not default branch {expected_ref})",
             }
 
-        # Use HEAD commit SHA as the version identifier
-        head_sha = payload.get("head_commit", {}).get("id", "")[:7] or "HEAD"
+        # Use the FULL HEAD commit SHA as the version identifier (never the
+        # 7-char prefix — short SHAs can collide across pushes).
+        head_sha = payload.get("head_commit", {}).get("id", "") or payload.get("after", "") or "HEAD"
+        if head_sha in ("0000000000000000000000000000000000000000", ""):
+            head_sha = "HEAD"
         return await _queue_changelog_for_tag(db, background_tasks, full_name, head_sha)
 
     return {"status": "ignored", "message": "Not a tag, release, or default-branch push event"}

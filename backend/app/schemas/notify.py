@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -14,8 +16,11 @@ def _ensure_utc(value):
     return value
 
 
+NotifyProviderName = Literal["smtp", "sendgrid", "slack"]
+
+
 class NotifyConfigCreate(BaseModel):
-    provider: str  # smtp, sendgrid, slack
+    provider: NotifyProviderName
 
     # SMTP fields
     smtp_host: str | None = None
@@ -39,7 +44,7 @@ class NotifyConfigCreate(BaseModel):
 
 class NotifyConfigUpdate(BaseModel):
     """Partial update for an existing notification config."""
-    provider: str | None = None
+    provider: NotifyProviderName | None = None
     smtp_host: str | None = None
     smtp_port: int | None = None
     smtp_user: str | None = None

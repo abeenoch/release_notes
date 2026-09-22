@@ -39,6 +39,18 @@ class AuthService:
         github_id = str(gh_user["id"])
         github_login = gh_user.get("login", "")
         email = gh_user.get("email")
+        if not email:
+            # /user omits email without user:email scope or private setting —
+            # fall back to the verified primary address (best-effort).
+            try:
+                emails = await self.github.get_user_emails(gh_token)
+                primary = next(
+                    (e for e in emails if e.get("primary") and e.get("verified")),
+                    next((e for e in emails if e.get("verified")), None),
+                )
+                email = (primary or {}).get("email")
+            except Exception:
+                email = None
         display_name = gh_user.get("name") or github_login
         avatar_url = gh_user.get("avatar_url")
 
@@ -64,6 +76,7 @@ class AuthService:
             db.add(user)
 
         await db.flush()
+        await db.commit()
 
         # 4. Create JWT
         token = create_access_token(user_id=user.id)

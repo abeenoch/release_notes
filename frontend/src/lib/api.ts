@@ -66,10 +66,15 @@ export const reposApi = {
 }
 
 export const changelogApi = {
-  generate: (body: { repo_id: string }) =>
+  generate: (body: { repo_id: string; from_tag?: string; to_tag?: string }) =>
     request<Changelog>('POST', '/changelogs/generate', body),
-  list: (repoId?: string) =>
-    request<ChangelogListResponse>('GET', `/changelogs/${repoId ? `?repo_id=${repoId}` : ''}`),
+  list: (repoId?: string, limit = 50, offset = 0) => {
+    const params = new URLSearchParams()
+    if (repoId) params.set('repo_id', repoId)
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    return request<ChangelogListResponse>('GET', `/changelogs/?${params.toString()}`)
+  },
   get: (id: string) => request<Changelog>('GET', `/changelogs/${id}`),
 }
 

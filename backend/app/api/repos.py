@@ -135,6 +135,7 @@ async def sync_github_repos(
         synced.append(repo)
 
     await db.flush()
+    await db.commit()
     return RepoListResponse(repos=[
         RepoResponse(
             id=r.id,
@@ -220,6 +221,7 @@ async def import_selected_repos(
                 logger.warning("Could not create webhook for %s", full_name, exc_info=True)
 
     await db.flush()
+    await db.commit()
     return RepoListResponse(repos=[
         RepoResponse(
             id=r.id,
@@ -261,6 +263,22 @@ async def toggle_repo_active(
         repo.is_active = not repo.is_active
     
     await db.flush()
+    await db.commit()
+    # Best-effort: keep the GitHub webhook in sync with the active flag.
+    try:
+        _user = await db.get(User, user_id)
+        if _user is not None and _user.github_token:
+            from app.services.github import GitHubClient as _GHC
+            _gh = _GHC(client_id=settings.github_client_id or "", client_secret=settings.github_client_secret or "")
+            _tok = decrypt_api_key(_user.github_token)
+            if settings.webhook_base_url and settings.github_webhook_secret:
+                _url = f"{settings.webhook_base_url}/api/webhook"
+                if repo.is_active:
+                    await _gh.create_webhook(_tok, repo.full_name, webhook_url=_url, webhook_secret=settings.github_webhook_secret)
+                else:
+                    await _gh.delete_webhook(_tok, repo.full_name, webhook_url=_url)
+    except Exception:
+        logger.warning("Could not sync webhook for %s", repo.full_name, exc_info=True)
     return RepoResponse(
         id=repo.id,
         full_name=repo.full_name,
@@ -287,4 +305,13 @@ async def remove_repo(
     repo = result.scalar_one_or_none()
     if not repo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    try:
+        _owner = await db.get(User, user_id)
+        if _owner is not None and _owner.github_token and settings.webhook_base_url:
+            from app.services.github import GitHubClient as _GHC2
+            _gh2 = _GHC2(client_id=settings.github_client_id or "", client_secret=settings.github_client_secret or "")
+            await _gh2.delete_webhook(decrypt_api_key(_owner.github_token), repo.full_name, webhook_url=f"{settings.webhook_base_url}/api/webhook")
+    except Exception:
+        logger.warning("Could not delete webhook for %s", repo.full_name, exc_info=True)
     await db.delete(repo)
+    await db.commit()

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -15,8 +17,11 @@ def _ensure_utc(value):
 
 
 
+LlmProviderName = Literal["openai", "anthropic", "ollama", "groq", "openrouter", "commit"]
+
+
 class LlmConfigCreate(BaseModel):
-    provider: str  # openai, anthropic, ollama, groq, openrouter, commit
+    provider: LlmProviderName
     api_key: str | None = None
     model: str | None = None
     base_url: str | None = None

@@ -14,6 +14,12 @@ from app.config import settings
 def _get_fernet() -> Fernet:
     key = settings.encryption_key
     if not key:
+        # Never silently derive from the default SECRET_KEY in production:
+        # every default deploy would then share one encryption key.
+        if not settings.debug and settings.secret_key == "change-me-in-production":
+            raise RuntimeError(
+                "ENCRYPTION_KEY (or a non-default SECRET_KEY) is required in production"
+            )
         # In dev, derive a key from SECRET_KEY so we don't need a separate env var
         from base64 import urlsafe_b64encode
         raw = settings.secret_key.encode("utf-8").ljust(32, b"\0")[:32]

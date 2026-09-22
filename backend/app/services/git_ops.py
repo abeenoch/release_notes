@@ -1,11 +1,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
 from git import Repo as GitRepo
 from git.exc import GitCommandError
+
+logger = logging.getLogger(__name__)
 
 
 class GitClient:
@@ -34,10 +37,17 @@ class GitClient:
         if from_tag and to_tag:
             return from_tag, to_tag
 
+        all_tag_names = [t.name for t in self.repo.tags if t.name]
         tags = sorted(
-            [t.name for t in self.repo.tags if t.name.startswith("v") or (t.name and t.name[0].isdigit())],
+            [t for t in all_tag_names if t.startswith("v") or (t and t[0].isdigit())],
             key=lambda t: [int(p) if p.isdigit() else p for p in t.lstrip("v").split(".")],
         )
+        ignored = len(all_tag_names) - len(tags)
+        if ignored:
+            logger.info(
+                "resolve_tags: ignoring %d non-semver tag(s) (only v*/digit tags used)",
+                ignored,
+            )
 
         latest = tags[-1] if tags else "HEAD"
         previous = tags[-2] if len(tags) >= 2 else (tags[-1] if tags else None)
@@ -56,12 +66,13 @@ class GitClient:
         except GitCommandError:
             return False
 
-    def get_diff_summary(self, from_ref: str | None, to_ref: str) -> str:
+    def get_diff_summary(self, from_ref: str | None, to_ref: str, max_commits: int = 300) -> str:
         """Get the commit log between two refs.
 
         No silent fallback is attempted — if the range is invalid the caller
         is responsible for resetting tracking, so we never emit an overlapping
-        "recent N commits" dump.
+        "recent N commits" dump. Large histories are truncated to the newest
+        `max_commits` so LLM prompts stay bounded.
         """
         try:
             if from_ref:
@@ -74,11 +85,21 @@ class GitClient:
         if not commits:
             return "(no commits found between these refs)"
 
+        total = len(commits)
+        if total > max_commits:
+            logger.info(
+                "Truncating diff summary: %d commits → newest %d", total, max_commits
+            )
+            # iter_commits yields newest-first, so slice keeps the newest.
+            commits = commits[:max_commits]
+
         lines: list[str] = []
         for commit in commits:
             date = commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")
             msg = commit.message.split("\n")[0].strip()
             lines.append(f"[{commit.hexsha[:7]}] {date} — {msg}")
+        if total > max_commits:
+            lines.append(f"... and {total - max_commits} older commits omitted")
         return "\n".join(lines)
 
     def get_diff_patch(self, from_ref: str, to_ref: str) -> str | None:
@@ -118,31 +139,53 @@ class GitClient:
             return "unknown"
 
     @classmethod
-    def clone_repo(cls, clone_url: str, clone_path: str, branch: str = "main") -> "GitClient":
-        """Clone a repository and return a GitClient for it."""
+    def clone_repo(
+        cls,
+        clone_url: str,
+        clone_path: str,
+        branch: str = "main",
+        token: str | None = None,
+    ) -> "GitClient":
+        """Clone a repository and return a GitClient for it.
+
+        When `token` is given, it is passed via the
+        `http.extraHeader` git config (Authorization: Bearer …) so the
+        secret never lands in `.git/config`'s origin URL. `clone_url`
+        must therefore be token-free in that case.
+        """
         path = Path(clone_path)
         # Only treat as existing if it's a valid git repo (has .git dir/file)
         is_valid_repo = path.exists() and (path / ".git").exists()
+        extra_env = None
+        if token:
+            extra_env = {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "http.extraHeader",
+                "GIT_CONFIG_VALUE_0": f"Authorization: Bearer {token}",
+            }
         if is_valid_repo:
             # Pull instead
             repo = GitRepo(clone_path)
             try:
-                repo.remotes.origin.fetch("--tags", "--force")
+                repo.remotes.origin.fetch("--tags", "--force", env=extra_env)
             except Exception:
-                pass  # tags may already be up to date
+                logger.warning("fetch --tags failed for %s", clone_path, exc_info=True)
             try:
                 repo.git.checkout(branch)
             except Exception:
-                pass
+                logger.warning("checkout %s failed for %s", branch, clone_path, exc_info=True)
             try:
-                repo.remotes.origin.pull()
+                repo.remotes.origin.pull(env=extra_env)
             except Exception:
-                pass  # pull may fail if no upstream
+                logger.warning("pull failed for %s (may have no upstream)", clone_path, exc_info=True)
         else:
             # Remove any stale empty/partial dir, then clone fresh
             if path.exists():
                 import shutil
                 shutil.rmtree(clone_path)
             path.parent.mkdir(parents=True, exist_ok=True)
-            GitRepo.clone_from(clone_url, clone_path, branch=branch, multi_options=["--tags"])
+            GitRepo.clone_from(
+                clone_url, clone_path, branch=branch,
+                multi_options=["--tags"], env=extra_env,
+            )
         return cls(repo_path=clone_path)

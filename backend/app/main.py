@@ -21,8 +21,27 @@ from app.api.notify_routes import router as notify_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: initialize DB. Shutdown: clean up."""
+    """Startup: initialize DB + reap stale tasks. Shutdown: clean up."""
     await init_db()
+    try:
+        from datetime import datetime, timedelta, timezone
+        from sqlalchemy import update
+        from app.database import async_session_factory
+        from app.models.changelog import Changelog as _Changelog
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+        async with async_session_factory() as _db:
+            await _db.execute(
+                update(_Changelog)
+                .where(
+                    _Changelog.status.in_(["pending", "processing"]),
+                    _Changelog.created_at < cutoff,
+                )
+                .values(status="failed", error_message="Stale task reaped on startup (server restarted before completion)")
+            )
+            await _db.commit()
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).exception("Startup reap of stale changelogs failed")
     yield
 
 

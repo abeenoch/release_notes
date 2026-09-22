@@ -52,19 +52,29 @@ class ChangelogService:
         4. Call LLM (or commit parser)
         5. Return result
         """
-        # 1. Clone / pull the repo
-        work_dir = Path(settings.clone_work_dir) / user.id / repo.full_name.replace("/", "_")
+        # 1. Clone / pull the repo. Resolve the work dir to an absolute path
+        # so systemd/uvicorn invocations from different CWDs share one dir.
+        base_dir = Path(settings.clone_work_dir)
+        if not base_dir.is_absolute():
+            data_dir = Path(settings.data_dir)
+            if not data_dir.is_absolute():
+                # config.py defaults are relative to backend/ root
+                data_dir = Path(__file__).resolve().parent.parent.parent / data_dir
+            base_dir = (data_dir / base_dir.name).resolve() if base_dir.name else data_dir.resolve()
+        work_dir = base_dir / user.id / repo.full_name.replace("/", "_")
         work_dir.mkdir(parents=True, exist_ok=True)
 
         if repo.clone_url:
             git = GitClient.clone_repo(repo.clone_url, str(work_dir), repo.default_branch)
         else:
-            # Clone via GitHub using user's token
+            # Clone via GitHub using the user's token. The token travels in
+            # the git http.extraHeader (never in the clone URL) so it is not
+            # persisted in .git/config's origin URL.
             if not user.github_token:
                 raise ValueError("No GitHub token available to clone repository")
             gh_token = decrypt_api_key(user.github_token)
-            clone_url = f"https://x-access-token:{gh_token}@github.com/{repo.full_name}.git"
-            git = GitClient.clone_repo(clone_url, str(work_dir), repo.default_branch)
+            clone_url = f"https://github.com/{repo.full_name}.git"
+            git = GitClient.clone_repo(clone_url, str(work_dir), repo.default_branch, token=gh_token)
 
         # 2. Resolve the commit range
         incremental = False
@@ -147,8 +157,11 @@ class ChangelogService:
         #     (guards against the LLM inventing "v1.0.0" anyway)
         markdown = _fix_changelog_heading(markdown, to_name)
 
-        # 6. Count commits
-        commit_count = len(diff_summary.split("\n")) if diff_summary != "(no commits found between these refs)" else 0
+        # 6. Count commits (sentinel strings mean zero real commits)
+        if diff_summary in ("(no commits found between these refs)", "(could not retrieve commits)"):
+            commit_count = 0
+        else:
+            commit_count = sum(1 for line in diff_summary.split("\n") if line.strip() and not line.startswith("... and "))
 
         # 7. Human-readable summary
         if full_history:
@@ -191,4 +204,5 @@ class ChangelogService:
         changelog = await self.generate(user, repo, from_tag, to_tag, db)
         db.add(changelog)
         await db.flush()
+        await db.commit()
         return changelog

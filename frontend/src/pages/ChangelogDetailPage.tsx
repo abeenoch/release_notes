@@ -12,12 +12,21 @@ function renderMarkdown(md: string): string {
   // Minimal, safe markdown → HTML (headings, lists, bold/italic, code, links)
   const esc = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const escAttr = (s: string) => esc(s).replace(/"/g, '&quot;')
+  const safeLink = (text: string, url: string) => {
+    const u = url.trim()
+    // Allowlist: block javascript:/data:/vbscript: XSS via [x](javascript:...)
+    if (!/^(https?:\/\/|mailto:|#|\/)/i.test(u)) {
+      return esc(text)
+    }
+    return `<a href="${escAttr(u)}" target="_blank" rel="noopener">${text}</a>`
+  }
   const inline = (s: string) =>
     esc(s)
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m: string, txt: string, url: string) => safeLink(txt, url))
 
   const lines = md.split('\n')
   const out: string[] = []
