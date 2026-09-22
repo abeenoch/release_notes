@@ -20,7 +20,10 @@ import app.models.user_config  # noqa: F401
 import app.models.notify_config  # noqa: F401
 
 from app.services import publish_service
-from app.services.github import GitHubApiError, ReleaseAlreadyExistsError
+from app.services.github import (
+    GitHubApiError, ReleaseAlreadyExistsError, _github_error_detail,
+    _is_already_exists,
+)
 
 
 @pytest_asyncio.fixture
@@ -183,3 +186,91 @@ async def test_github_failure_carries_a_clean_message(db, monkeypatch):
     # The message must be human, never the raw httpx repr.
     assert "httpx" not in exc.value.detail
     assert "for url" not in exc.value.detail
+
+
+class _FakeResponse:
+    """Minimal stand-in for httpx.Response for error-path tests."""
+
+    def __init__(self, status_code, payload=None):
+        self.status_code = status_code
+        self._payload = payload
+        self.headers = {}
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("no JSON body")
+        return self._payload
+
+
+# The exact payload GitHub returned today for a 40-hex release tag.
+PRE_RECEIVE_422 = {
+    "message": "Validation Failed",
+    "errors": [
+        {
+            "resource": "Release",
+            "code": "custom",
+            "field": "pre_receive",
+            "message": "pre_receive Sorry, branch or tag names consisting of 40 or 64 hex characters are not allowed.",
+        },
+        {
+            "resource": "Release",
+            "code": "custom",
+            "message": "Published releases must have a valid tag",
+        },
+    ],
+}
+
+ALREADY_EXISTS_422 = {
+    "message": "Validation Failed",
+    "errors": [{"resource": "Release", "code": "already_exists", "field": "tag_name"}],
+}
+
+
+def test_already_exists_only_when_payload_says_so():
+    assert _is_already_exists(_FakeResponse(422, ALREADY_EXISTS_422)) is True
+    assert _is_already_exists(_FakeResponse(409, ALREADY_EXISTS_422)) is True
+    # A 422 for other reasons (tag-shape rejection etc.) is NOT a duplicate.
+    assert _is_already_exists(_FakeResponse(422, PRE_RECEIVE_422)) is False
+    assert _is_already_exists(_FakeResponse(422, {"message": "Validation Failed"})) is False
+    assert _is_already_exists(_FakeResponse(422, None)) is False
+
+
+def test_error_detail_prefers_githubs_own_explanation():
+    detail = _github_error_detail(_FakeResponse(422, PRE_RECEIVE_422), "creating the release")
+    assert "Published releases must have a valid tag" in detail
+    assert "40 or 64 hex" in detail
+    assert "httpx" not in detail and "for url" not in detail
+
+
+def test_release_tag_shortens_full_sha():
+    from app.services import publish_service as ps
+    from types import SimpleNamespace
+
+    mk = lambda tag, **kw: SimpleNamespace(to_tag=tag, version=kw.get("version"))
+    assert ps._release_tag(mk("23cf4904f513493d05d06f4c2977bc698bddd230")) == "23cf490"
+    assert ps._release_tag(mk("4a87346")) == "4a87346"
+    assert ps._release_tag(mk("v1.2.3")) == "v1.2.3"
+    assert ps._release_tag(mk(None, version=None)) is None
+
+
+@pytest.mark.asyncio
+async def test_publish_shortens_forbidden_tag_and_points_at_commit(db, monkeypatch):
+    """The 23cf490 case: create goes out with tag '23cf490' aimed at the full SHA."""
+    _, repo, changelog = await _seed(db, to_tag="23cf4904f513493d05d06f4c2977bc698bddd230")
+
+    calls: dict = {}
+
+    class RecordingGitHub(FakeGitHub):
+        async def create_release(self, token, full_name, tag, name, body, **kw):
+            calls.update(tag=tag, target_commitish=kw.get("target_commitish"))
+            return await super().create_release(token, full_name, tag, name, body, **kw)
+
+    monkeypatch.setattr(publish_service, "_client", lambda: RecordingGitHub())
+    result = await publish_service.publish_release(changelog, repo, db)
+
+    assert result["status"] == "created"
+    assert result["tag"] == "23cf490"
+    assert calls["tag"] == "23cf490"
+    assert calls["target_commitish"] == "23cf4904f513493d05d06f4c2977bc698bddd230"
+    await db.refresh(changelog)
+    assert changelog.release_url.endswith("/23cf490")

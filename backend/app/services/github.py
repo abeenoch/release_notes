@@ -19,6 +19,26 @@ class ReleaseAlreadyExistsError(ValueError):
     """
 
 
+def _is_already_exists(response) -> bool:
+    """True only when GitHub's errors payload says already_exists.
+
+    A 422/409 alone proves nothing — e.g. `pre_receive ... tag names ... are
+    not allowed` and `Published releases must have a valid tag` are validation
+    rejections, not duplicates. Treating those as "already published" produced
+    the lie "A release already exists" for releases that don't.
+    """
+    try:
+        data = response.json()
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    return any(
+        isinstance(err, dict) and err.get("code") == "already_exists"
+        for err in data.get("errors") or []
+    )
+
+
 class GitHubApiError(RuntimeError):
     """A GitHub API call failed, carrying the HTTP status for mapping.
 
@@ -32,6 +52,27 @@ class GitHubApiError(RuntimeError):
         self.detail = detail
 
 
+def _detail_from_errors(response) -> str | None:
+    """Prefer GitHub's own explanation (errors[].message) when it has one.
+
+    e.g. a rejected release create says exactly why: "Published releases must
+    have a valid tag" — far more useful than any canned message.
+    """
+    try:
+        data = response.json()
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    msgs: list[str] = []
+    for err in data.get("errors") or []:
+        if isinstance(err, dict) and err.get("message"):
+            msg = str(err["message"]).removeprefix("pre_receive ").strip()
+            if msg and msg not in msgs:
+                msgs.append(msg)
+    return " — ".join(msgs) or None
+
+
 def _github_error_detail(response, action: str) -> str:
     """Build a short, non-leaky message for a failed GitHub call.
 
@@ -39,6 +80,9 @@ def _github_error_detail(response, action: str) -> str:
     at the user (e.g. "Client error '422 Unprocessable Entity' for url ...").
     """
     code = response.status_code
+    explained = _detail_from_errors(response)
+    if explained:
+        return explained
     if code in (401, 403):
         remaining = response.headers.get("x-ratelimit-remaining")
         if remaining == "0":
@@ -230,11 +274,18 @@ class GitHubClient:
                 json=payload,
             )
             if response.status_code in (422, 409):
-                # A release for this tag already exists (GitHub returns
-                # 422 already_exists). Not an error for us — the caller
-                # resolves it and reports "already published".
-                raise ReleaseAlreadyExistsError(
-                    f"A release for {tag} already exists on GitHub"
+                if _is_already_exists(response):
+                    # A release for this tag really does exist. Not an error
+                    # for us — the caller resolves it and reports
+                    # "already published".
+                    raise ReleaseAlreadyExistsError(
+                        f"A release for {tag} already exists on GitHub"
+                    )
+                # Any other 422 (e.g. GitHub refusing a tag shape, bad name,
+                # missing commitish) is a real failure — carry its message.
+                raise GitHubApiError(
+                    response.status_code,
+                    _github_error_detail(response, "creating the release"),
                 )
             if response.status_code != 201:
                 raise GitHubApiError(

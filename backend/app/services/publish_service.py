@@ -46,6 +46,26 @@ def _release_body(changelog: ChangelogModel) -> str:
     return changelog.raw_markdown or "*No changelog content.*"
 
 
+_SHA40_RE = None  # compiled lazily to keep import time trivial
+
+
+def _release_tag(changelog: ChangelogModel) -> str | None:
+    """The GitHub tag to publish under.
+
+    Push-generated changelogs carry the full 40-hex commit SHA, which GitHub
+    rejects outright ("branch or tag names consisting of 40 or 64 hex
+    characters are not allowed"). Shorten those to the classic 7-char
+    abbreviation — matching every release this repo already has — while the
+    changelog record keeps holding the exact ref.
+    """
+    import re
+
+    tag = changelog.to_tag or changelog.version
+    if tag and re.fullmatch(r"[0-9a-f]{40}", tag):
+        return tag[:7]
+    return tag
+
+
 def _record_publish_state(
     changelog: ChangelogModel, release: dict, db: AsyncSession
 ) -> None:
@@ -76,7 +96,7 @@ async def publish_release(
     created outside this flow). A release body is never rewritten.
     """
     token = await _user_token(db, changelog.user_id)
-    tag = changelog.to_tag or changelog.version
+    tag = _release_tag(changelog)
     if not tag or tag.startswith("HEAD"):
         raise ValueError(
             "This changelog has no tag — releases need a version tag. "
@@ -86,6 +106,10 @@ async def publish_release(
     # 1. Already published by us → nothing to do (not even a GitHub call).
     if changelog.release_url:
         return _published_response(changelog, tag)
+
+    # The release points at the exact commit the changelog covers, even when
+    # the tag was shortened for GitHub's naming rules.
+    target_commitish = changelog.to_tag if changelog.to_tag != tag else None
 
     client = _client()
 
@@ -107,6 +131,7 @@ async def publish_release(
             tag=tag,
             name=changelog.version or tag,
             body=_release_body(changelog),
+            target_commitish=target_commitish,
         )
     except ReleaseAlreadyExistsError:
         # Lost a race with a concurrent publish — resolve what exists.
