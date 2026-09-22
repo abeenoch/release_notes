@@ -9,8 +9,10 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # Load .env from the backend root (next to config.py → ../../)
+# override=False → real environment variables win over .env, so deploys/CI/
+# tests can point DATABASE_URL etc. elsewhere without editing .env.
 _env_path = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=_env_path, override=True)
+load_dotenv(dotenv_path=_env_path, override=False)
 
 
 @dataclass

@@ -34,6 +34,76 @@ _CHANGELOG_ADDITIONS: dict[str, str] = {
     "notification_status": "VARCHAR(20)",
 }
 
+_UNIQUE_CHANGELOG_INDEX_SQL = text(
+    "CREATE UNIQUE INDEX IF NOT EXISTS "
+    "uq_changelogs_repo_to_tag ON changelogs(repo_id, to_tag)"
+)
+
+# Keeps one row per (repo_id, to_tag): prefer a usable result, then newest.
+# Only touches rows that are duplicates of another row — nothing unique is lost.
+_DEDUPE_CHANGELOGS_SQL = text(
+    """
+    DELETE FROM changelogs
+    WHERE to_tag IS NOT NULL
+      AND id NOT IN (
+        SELECT id FROM (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY repo_id, to_tag
+                     ORDER BY CASE status
+                                WHEN 'completed' THEN 0
+                                WHEN 'processing' THEN 1
+                                WHEN 'pending' THEN 2
+                                ELSE 3
+                              END,
+                              created_at DESC,
+                              id DESC
+                   ) AS rn
+            FROM changelogs
+            WHERE to_tag IS NOT NULL
+        )
+        WHERE rn = 1
+      )
+    """
+)
+
+
+async def _ensure_unique_changelog_index(conn) -> None:
+    """Create the (repo_id, to_tag) unique index — the last-line idempotency guard.
+
+    Double webhook deliveries before the fix left duplicate rows, and SQLite
+    refuses to build a unique index over them. Trying once and swallowing the
+    error (the previous behaviour) silently disabled the guard in production,
+    so on failure we dedupe first and retry. Dedupe only removes rows that have
+    a twin with the same (repo_id, to_tag); nothing references changelogs by FK.
+    """
+    try:
+        await conn.execute(_UNIQUE_CHANGELOG_INDEX_SQL)
+        return
+    except Exception as exc:
+        logger.warning(
+            "uq_changelogs_repo_to_tag could not be created (%s) — deduping changelogs", exc
+        )
+    try:
+        before = (await conn.execute(text("SELECT COUNT(*) FROM changelogs"))).scalar()
+        await conn.execute(_DEDUPE_CHANGELOGS_SQL)
+        after = (await conn.execute(text("SELECT COUNT(*) FROM changelogs"))).scalar()
+        removed = (before or 0) - (after or 0)
+        if removed:
+            logger.warning(
+                "Removed %s duplicate changelog row(s) to enforce (repo_id, to_tag) uniqueness",
+                removed,
+            )
+        await conn.execute(_UNIQUE_CHANGELOG_INDEX_SQL)
+        logger.info("Created uq_changelogs_repo_to_tag (after dedupe)")
+    except Exception as exc:
+        logger.error(
+            "Could not create uq_changelogs_repo_to_tag even after dedupe (%s) — "
+            "webhook idempotency falls back to the pre-insert check only",
+            exc,
+        )
+
+
 _REPO_ADDITIONS: dict[str, str] = {
     "last_generated_commit": "VARCHAR(40)",
 }
@@ -61,18 +131,10 @@ async def _ensure_sqlite_columns() -> None:
                         logger.info("Applied dev migration: added %s.%s", table, col)
                     except Exception as exc:  # column already exists etc.
                         logger.warning("Could not add %s.%s (%s)", table, col, exc)
-        # Backfill the (repo_id, to_tag) idempotency constraint: create the
-        # unique index if it doesn't exist (SQLite has no ADD CONSTRAINT).
-        # Duplicates from before the fix are left alone — newest wins on read.
-        try:
-            await conn.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS "
-                    "uq_changelogs_repo_to_tag ON changelogs(repo_id, to_tag)"
-                )
-            )
-        except Exception as exc:
-            logger.warning("Could not create uq_changelogs_repo_to_tag index (%s)", exc)
+        # Backfill the (repo_id, to_tag) idempotency constraint (SQLite has no
+        # ADD CONSTRAINT). Old duplicates are deduped first, otherwise the
+        # index cannot be built and idempotency would be unguarded.
+        await _ensure_unique_changelog_index(conn)
 
 
 # FastAPI dependency
