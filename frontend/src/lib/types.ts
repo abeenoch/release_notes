@@ -39,6 +39,9 @@ export interface Changelog {
   status: ChangelogStatus
   error_message?: string | null
   notification_status?: NotificationStatus
+  /** Set once the notes have been published as a GitHub Release. */
+  release_url?: string | null
+  published_at?: string | null
   created_at: string
 }
 

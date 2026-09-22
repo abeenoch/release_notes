@@ -74,11 +74,14 @@ class ChangelogResponse(BaseModel):
     status: str = "pending"
     error_message: str | None = None
     notification_status: str | None = None
+    # GitHub Release publish state
+    release_url: str | None = None
+    published_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
-    @field_validator("created_at", mode="before")
+    @field_validator("created_at", "published_at", mode="before")
     @classmethod
     def _utc(cls, v):
         return _ensure_utc(v)

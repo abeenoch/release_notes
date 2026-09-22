@@ -16,6 +16,7 @@ from app.schemas.changelog import (
 )
 from app.services.changelog_service import ChangelogService
 from app.services import publish_service
+from app.services.github import GitHubApiError
 from app.tasks.worker import run_changelog_generation
 import logging
 
@@ -191,16 +192,36 @@ async def publish_github_release(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a GitHub Release on the changelog's tag with the generated notes."""
+    """Publish the changelog's notes as a GitHub Release.
+
+    Idempotent: if this changelog (or its tag) already has a release, responds
+    200 with status "already_published" instead of updating or erroring.
+    """
     changelog, repo = await _load_changelog_and_repo(changelog_id, user_id, db)
     try:
-        result = await publish_service.publish_release(changelog, repo, db)
+        return await publish_service.publish_release(changelog, repo, db)
     except ValueError as exc:
+        # Bad input on our side (e.g. no tag to release) → 400.
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:  # GitHub API errors → 502 with detail
+    except GitHubApiError as exc:
+        # GitHub said no — surface its status honestly instead of a blanket 502.
+        logger.warning(
+            "GitHub rejected release publish for changelog %s: HTTP %s",
+            changelog_id, exc.status_code,
+        )
+        http_status = (
+            status.HTTP_404_NOT_FOUND if exc.status_code == 404
+            else status.HTTP_403_FORBIDDEN if exc.status_code in (401, 403)
+            else status.HTTP_429_TOO_MANY_REQUESTS if exc.status_code == 429
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        raise HTTPException(status_code=http_status, detail=exc.detail)
+    except Exception:
         logger.exception("Release publish failed for changelog %s", changelog_id)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)[:500])
-    return result
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Publishing to GitHub failed — please try again",
+        )
 
 
 # ── Changelog Generation ──
@@ -280,6 +301,7 @@ async def list_changelogs(
             llm_provider=c.llm_provider, commit_count=c.commit_count,
             status=c.status, error_message=c.error_message,
             notification_status=c.notification_status,
+            release_url=c.release_url, published_at=c.published_at,
             created_at=c.created_at,
         )
         for c in changelogs
@@ -309,5 +331,6 @@ async def get_changelog(
         llm_provider=changelog.llm_provider, commit_count=changelog.commit_count,
         status=changelog.status, error_message=changelog.error_message,
         notification_status=changelog.notification_status,
+        release_url=changelog.release_url, published_at=changelog.published_at,
         created_at=changelog.created_at,
     )

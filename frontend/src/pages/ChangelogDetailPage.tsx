@@ -67,7 +67,7 @@ export function ChangelogDetailPage() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [releaseUrl, setReleaseUrl] = useState<string | null>(null)
+  const [publishNote, setPublishNote] = useState('')
   const [actionError, setActionError] = useState('')
 
   const load = useCallback(async () => {
@@ -84,6 +84,11 @@ export function ChangelogDetailPage() {
 
   // Re-run when the changelog settles, so polling stops at a terminal state.
   const settled = changelog?.status === 'completed' || changelog?.status === 'failed'
+
+  // Publishing is create-once: derive it from the changelog, not from the last
+  // response, so the "already published" state survives a reload.
+  const published = !!changelog?.release_url
+  const releaseUrl = changelog?.release_url ?? null
 
   useEffect(() => {
     if (settled) return
@@ -129,9 +134,14 @@ export function ChangelogDetailPage() {
     if (!changelogId) return
     setPublishing(true)
     setActionError('')
+    setPublishNote('')
     try {
       const res = await publishApi.publishRelease(changelogId)
-      if (res?.release_url) setReleaseUrl(res.release_url)
+      // Publishing is create-once: a second click is not an error, it just
+      // reports that the notes are already live.
+      if (res?.status === 'already_published') {
+        setPublishNote(res.message || 'The release notes for this changelog have already been published')
+      }
       await load()
     } catch (e) {
       setActionError((e as Error).message)
@@ -206,10 +216,21 @@ export function ChangelogDetailPage() {
           <button onClick={download} className={`${btnBase} border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800`}>
             <Download size={16} /> Download .md
           </button>
-          <button onClick={publishRelease} disabled={publishing} className={`${btnBase} border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800`}>
-            {publishing ? <Loader2 size={16} className="animate-spin" /> : <Github size={16} />}
-            Publish as GitHub Release
-          </button>
+          {published ? (
+            // Already published: don't invite a pointless second click.
+            <span className={`${btnBase} border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400`}>
+              <Check size={16} />
+              Published
+              {changelog.published_at && (
+                <span className="font-normal opacity-80">· {new Date(changelog.published_at).toLocaleDateString()}</span>
+              )}
+            </span>
+          ) : (
+            <button onClick={publishRelease} disabled={publishing} className={`${btnBase} border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800`}>
+              {publishing ? <Loader2 size={16} className="animate-spin" /> : <Github size={16} />}
+              Publish as GitHub Release
+            </button>
+          )}
           {releaseUrl && (
             <a href={releaseUrl} target="_blank" rel="noopener"
               className={`${btnBase} text-emerald-600 hover:underline dark:text-emerald-400`}>
@@ -217,6 +238,12 @@ export function ChangelogDetailPage() {
             </a>
           )}
         </div>
+      )}
+
+      {publishNote && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          {publishNote}
+        </p>
       )}
 
       {actionError && <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p>}

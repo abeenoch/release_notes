@@ -79,10 +79,17 @@ export const changelogApi = {
 }
 
 // Backend actions added for publishing
+export interface PublishResult {
+  /** "created" for a new release, "already_published" if it existed. */
+  status: 'created' | 'already_published'
+  tag?: string
+  release_url?: string
+  message?: string
+}
+
 export const publishApi = {
   publishRelease: (changelogId: string) =>
-    request<{ release_url?: string; tag?: string }>(
-      'POST', `/changelogs/${changelogId}/publish-release`),
+    request<PublishResult>('POST', `/changelogs/${changelogId}/publish-release`),
 }
 
 export const configApi = {

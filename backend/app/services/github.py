@@ -1,11 +1,57 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
 
+logger = logging.getLogger(__name__)
+
 GITHUB_API_BASE = "https://api.github.com"
 GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token"
+
+
+class ReleaseAlreadyExistsError(ValueError):
+    """GitHub already has a release for this tag (create returned 422/409).
+
+    Subclasses ValueError so callers that already handle bad-input paths keep
+    working, while being specific enough to treat as "already published".
+    """
+
+
+class GitHubApiError(RuntimeError):
+    """A GitHub API call failed, carrying the HTTP status for mapping.
+
+    `detail` is a short human-readable summary safe to show a user — never the
+    raw httpx repr (which leaks request plumbing and reads like a crash).
+    """
+
+    def __init__(self, status_code: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+def _github_error_detail(response, action: str) -> str:
+    """Build a short, non-leaky message for a failed GitHub call.
+
+    Used instead of `str(httpx.HTTPStatusError)`, which dumps request plumbing
+    at the user (e.g. "Client error '422 Unprocessable Entity' for url ...").
+    """
+    code = response.status_code
+    if code in (401, 403):
+        remaining = response.headers.get("x-ratelimit-remaining")
+        if remaining == "0":
+            return "GitHub rate limit reached — try again in a few minutes"
+        return "GitHub refused the request — reconnect GitHub and check the token's repo access"
+    if code == 404:
+        return "GitHub couldn't find that repo or tag — check the token's access to it"
+    if code == 422:
+        return "GitHub rejected the request (validation failed)"
+    if code >= 500:
+        return "GitHub is having trouble right now — try again shortly"
+    logger.warning("GitHub API call failed (HTTP %s) while %s", code, action)
+    return f"GitHub API error (HTTP {code})"
 
 
 class GitHubClient:
@@ -133,6 +179,27 @@ class GitHubClient:
                     return True
             return False
 
+    async def get_release_by_tag(
+        self, token: str, full_name: str, tag: str
+    ) -> dict[str, Any] | None:
+        """Return the existing release for a tag, or None if there isn't one."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{full_name}/releases/tags/{tag}",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+            )
+            if response.status_code == 404:
+                return None
+            if response.status_code != 200:
+                raise GitHubApiError(
+                    response.status_code,
+                    _github_error_detail(response, "looking up a release"),
+                )
+            return response.json()
+
     async def create_release(
         self,
         token: str,
@@ -162,7 +229,18 @@ class GitHubClient:
                 },
                 json=payload,
             )
-            response.raise_for_status()
+            if response.status_code in (422, 409):
+                # A release for this tag already exists (GitHub returns
+                # 422 already_exists). Not an error for us — the caller
+                # resolves it and reports "already published".
+                raise ReleaseAlreadyExistsError(
+                    f"A release for {tag} already exists on GitHub"
+                )
+            if response.status_code != 201:
+                raise GitHubApiError(
+                    response.status_code,
+                    _github_error_detail(response, "creating the release"),
+                )
             return response.json()
 
     async def get_installation_repos(

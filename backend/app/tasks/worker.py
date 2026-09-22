@@ -15,6 +15,69 @@ from app.services.notification_service import NotificationService
 logger = logging.getLogger(__name__)
 
 
+async def _absorb_duplicate_tag_row(
+    db: AsyncSession, changelog: ChangelogModel, to_tag: str | None
+) -> None:
+    """Remove a pre-existing row for the same (repo_id, to_tag), keeping ours.
+
+    `POST /generate` inserts a row with no `to_tag` and the worker fills it in
+    afterwards, so regenerating a repo that hasn't changed resolves to the same
+    `(repo_id, to_tag)` as an existing changelog. UNIQUE(repo_id, to_tag) then
+    rejects the write — which used to surface as a bogus "failed" changelog with
+    a raw SQL error.
+
+    We keep the *new* row (it's the one the UI is polling and just created) and
+    drop the older duplicate, carrying its publish state over so a refresh never
+    un-publishes a release.
+
+    Deletes and flushes before the caller assigns `to_tag`, because SQLite
+    enforces the unique constraint immediately.
+    """
+    if not to_tag:
+        return
+    result = await db.execute(
+        select(ChangelogModel)
+        .where(
+            ChangelogModel.repo_id == changelog.repo_id,
+            ChangelogModel.to_tag == to_tag,
+            ChangelogModel.id != changelog.id,
+        )
+        .order_by(ChangelogModel.created_at.asc())
+    )
+    for older in result.scalars().all():
+        # Carry publish state forward — the release is still live.
+        if not changelog.release_url:
+            changelog.release_id = older.release_id or changelog.release_id
+            changelog.release_url = older.release_url or changelog.release_url
+            changelog.published_at = older.published_at or changelog.published_at
+        logger.info(
+            "Changelog %s regenerates tag %s — replacing older duplicate %s",
+            changelog.id, to_tag, older.id,
+        )
+        await db.delete(older)
+    # Flush the DELETEs before the caller writes to_tag, or the UNIQUE
+    # constraint trips on the row we just removed in the same transaction.
+    await db.flush()
+
+
+def _apply_result(target: ChangelogModel, result: ChangelogModel) -> None:
+    """Copy generated fields onto `target`.
+
+    Deliberately does not touch release_url/release_id/published_at: refreshing
+    a changelog's notes must not un-publish it.
+    """
+    target.from_tag = result.from_tag
+    target.to_tag = result.to_tag
+    target.version = result.version
+    target.previous_version = result.previous_version
+    target.summary = result.summary
+    target.raw_markdown = result.raw_markdown
+    target.llm_provider = result.llm_provider
+    target.commit_count = result.commit_count
+    target.status = "completed"
+    target.error_message = None
+
+
 async def run_changelog_generation(changelog_id: str) -> None:
     """
     Background task: generate the changelog content, persist it, then
@@ -54,16 +117,12 @@ async def run_changelog_generation(changelog_id: str) -> None:
                 db=db,
             )
 
-            # 5. Copy result fields onto the saved record
-            changelog.from_tag = result.from_tag
-            changelog.to_tag = result.to_tag
-            changelog.version = result.version
-            changelog.previous_version = result.previous_version
-            changelog.summary = result.summary
-            changelog.raw_markdown = result.raw_markdown
-            changelog.llm_provider = result.llm_provider
-            changelog.commit_count = result.commit_count
-            changelog.status = "completed"
+            # 5. Persist the result. If an older changelog already occupies this
+            #    (repo, tag) — e.g. the repo hasn't changed since last time —
+            #    absorb it first (keeping our row, which the UI is polling, and
+            #    carrying its publish state), then write.
+            await _absorb_duplicate_tag_row(db, changelog, result.to_tag)
+            _apply_result(changelog, result)
             await db.commit()
 
             # 6. Send notification (best-effort — never fails the generation)

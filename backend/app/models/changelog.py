@@ -45,6 +45,16 @@ class Changelog(Base):
         String(20), nullable=True
     )  # None | sent | skipped | failed
 
+    # GitHub Release publish state. Publishing is create-once and idempotent:
+    # these fields let us tell "already published" from "not yet published"
+    # without calling GitHub, and stop accidental re-publishes from rewriting
+    # (or 422-ing on) an existing release.
+    release_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    release_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
