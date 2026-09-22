@@ -1,0 +1,81 @@
+name: CI
+
+# CI only: test + build every change. Nothing here deploys or restarts prod —
+# production is a manually launched uvicorn behind nginx, deployed by hand.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest + import smoke)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        # Full suite must pass; the app DB is never touched (tests use
+        # in-memory SQLite via create_async_engine fixtures).
+        run: python -m pytest tests/ -q
+
+      - name: Import smoke test
+        # Catches import-time errors (bad imports, missing modules) without
+        # booting the server. init_db only runs inside the app lifespan.
+        run: python -c "from app.main import app; print('routes:', len(app.routes))"
+
+  frontend:
+    name: Frontend (typecheck + build + dist check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and build
+        # `build` runs `tsc && vite build`, so type errors fail the build.
+        run: npm run build
+
+      - name: Verify committed dist/ is fresh
+        # The backend serves the committed frontend/dist/, not a build artifact.
+        # Rebuilding hashes the JS/CSS filenames, so a stale dist/ would break
+        # the served app: index.html would reference files that no longer exist
+        # (or miss new ones). If you changed frontend/src/ or frontend/public/,
+        # rebuild with `npm run build` and commit the result.
+        run: |
+          if ! git diff --exit-code -- dist/; then
+            echo "::error::frontend/dist/ is stale — run 'npm run build' in frontend/ and commit the result"
+            exit 1
+          fi
