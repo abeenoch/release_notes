@@ -2,13 +2,31 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
+import base64
+from contextlib import nullcontext as _nullcontext
 from git import Repo as GitRepo
 from git.exc import GitCommandError
 
 logger = logging.getLogger(__name__)
+
+
+def _semver_sort_key(tag: str) -> list[tuple[int, int | str]]:
+    """Ordering key for version-ish tags that can never raise.
+
+    The old key mixed ints and strings (`1.2` → [1,2] vs `1f21a87` → ['1f21a87']),
+    so sorting a repo whose tags were commit SHAs raised
+    `TypeError: '<' not supported between instances of 'str' and 'int'` and the
+    whole changelog generation failed. Tagging each part with its type makes
+    every comparison well-defined: numeric parts sort before non-numeric ones
+    at the same position, and SHA-style tags get a stable (if semantically
+    arbitrary) order.
+    """
+    return [
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in tag.lstrip("v").split(".")
+    ]
 
 
 class GitClient:
@@ -40,7 +58,7 @@ class GitClient:
         all_tag_names = [t.name for t in self.repo.tags if t.name]
         tags = sorted(
             [t for t in all_tag_names if t.startswith("v") or (t and t[0].isdigit())],
-            key=lambda t: [int(p) if p.isdigit() else p for p in t.lstrip("v").split(".")],
+            key=_semver_sort_key,
         )
         ignored = len(all_tag_names) - len(tags)
         if ignored:
@@ -156,36 +174,56 @@ class GitClient:
         path = Path(clone_path)
         # Only treat as existing if it's a valid git repo (has .git dir/file)
         is_valid_repo = path.exists() and (path / ".git").exists()
-        extra_env = None
-        if token:
-            extra_env = {
-                "GIT_CONFIG_COUNT": "1",
-                "GIT_CONFIG_KEY_0": "http.extraHeader",
-                "GIT_CONFIG_VALUE_0": f"Authorization: Bearer {token}",
-            }
+
+        # Token travels via git's GIT_CONFIG_* env config (http.extraHeader),
+        # never in the clone URL (which persists it in .git/config) and never
+        # as a CLI arg (which would land in `ps` output). GitPython's `env=`
+        # kwarg is NOT a supported parameter — it leaks the dict into the
+        # command line and breaks fetch parsing — so use custom_environment.
+        from git.cmd import Git as GitCmd
+        extra_env = {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "http.extraHeader",
+            # GitHub's git-over-HTTPS endpoint rejects raw `Authorization: Bearer`
+            # / `token` headers (unlike the REST API) — Basic with the OAuth
+            # username `x-access-token` is what it accepts.
+            "GIT_CONFIG_VALUE_0": "Authorization: Basic "
+            + base64.b64encode(f"x-access-token:{token}".encode()).decode(),
+        } if token else {}
+
+        def _git_env(git_cmd: GitCmd):
+            return git_cmd.custom_environment(**extra_env) if extra_env else _nullcontext()
+
         if is_valid_repo:
-            # Pull instead
+            # Pull instead. NOTE: use repo.git (flag-safe CLI interface), not
+            # Remote.fetch — `fetch("--tags", "--force")` silently swallowed
+            # --force into the `progress` parameter, so tags were NEVER updated
+            # after the initial clone.
             repo = GitRepo(clone_path)
             try:
-                repo.remotes.origin.fetch("--tags", "--force", env=extra_env)
+                with _git_env(repo.git):
+                    repo.git.fetch("--tags", "--force", "origin")
             except Exception:
                 logger.warning("fetch --tags failed for %s", clone_path, exc_info=True)
             try:
-                repo.git.checkout(branch)
+                with _git_env(repo.git):
+                    repo.git.checkout(branch)
             except Exception:
                 logger.warning("checkout %s failed for %s", branch, clone_path, exc_info=True)
             try:
-                repo.remotes.origin.pull(env=extra_env)
+                with _git_env(repo.git):
+                    repo.git.pull("--ff-only", "origin", branch)
             except Exception:
-                logger.warning("pull failed for %s (may have no upstream)", clone_path, exc_info=True)
+                logger.warning("pull --ff-only failed for %s", clone_path, exc_info=True)
         else:
             # Remove any stale empty/partial dir, then clone fresh
             if path.exists():
                 import shutil
                 shutil.rmtree(clone_path)
             path.parent.mkdir(parents=True, exist_ok=True)
-            GitRepo.clone_from(
-                clone_url, clone_path, branch=branch,
-                multi_options=["--tags"], env=extra_env,
-            )
+            with _git_env(GitCmd()):
+                GitRepo.clone_from(
+                    clone_url, clone_path, branch=branch,
+                    multi_options=["--tags"],
+                )
         return cls(repo_path=clone_path)
