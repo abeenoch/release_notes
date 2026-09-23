@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import select
 
@@ -14,10 +15,22 @@ from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
+# Notification outcomes that mean "we already told someone about this tag".
+# "failed" is deliberately excluded so a retry still gets attempted.
+_NOTIFIED_STATUSES = ("sent", "skipped")
+
+
+@dataclass
+class AbsorbedDuplicates:
+    """What was learned from the older row(s) folded into the new changelog."""
+
+    already_notified: bool = False
+    previous_markdown: str | None = None
+
 
 async def _absorb_duplicate_tag_row(
     db: AsyncSession, changelog: ChangelogModel, to_tag: str | None
-) -> None:
+) -> AbsorbedDuplicates:
     """Remove a pre-existing row for the same (repo_id, to_tag), keeping ours.
 
     `POST /generate` inserts a row with no `to_tag` and the worker fills it in
@@ -28,13 +41,15 @@ async def _absorb_duplicate_tag_row(
 
     We keep the *new* row (it's the one the UI is polling and just created) and
     drop the older duplicate, carrying its publish state over so a refresh never
-    un-publishes a release.
+    un-publishes a release — and its notification state, so regenerating an
+    unchanged tag doesn't email the same release twice.
 
     Deletes and flushes before the caller assigns `to_tag`, because SQLite
     enforces the unique constraint immediately.
     """
+    absorbed = AbsorbedDuplicates()
     if not to_tag:
-        return
+        return absorbed
     result = await db.execute(
         select(ChangelogModel)
         .where(
@@ -50,6 +65,13 @@ async def _absorb_duplicate_tag_row(
             changelog.release_id = older.release_id or changelog.release_id
             changelog.release_url = older.release_url or changelog.release_url
             changelog.published_at = older.published_at or changelog.published_at
+        # Carry notification state forward too, plus the notes that were sent so
+        # the caller can tell "same tag, same content" from a real change.
+        if older.notification_status in _NOTIFIED_STATUSES:
+            absorbed.already_notified = True
+            absorbed.previous_markdown = older.raw_markdown
+            if not changelog.notification_status:
+                changelog.notification_status = older.notification_status
         logger.info(
             "Changelog %s regenerates tag %s — replacing older duplicate %s",
             changelog.id, to_tag, older.id,
@@ -58,6 +80,22 @@ async def _absorb_duplicate_tag_row(
     # Flush the DELETEs before the caller writes to_tag, or the UNIQUE
     # constraint trips on the row we just removed in the same transaction.
     await db.flush()
+    return absorbed
+
+
+def should_notify(absorbed: AbsorbedDuplicates, new_markdown: str | None) -> bool:
+    """Whether this generation should send a notification.
+
+    Regenerating an unchanged repo resolves the same tag with byte-identical
+    notes — that is not news, so it must not send a second copy of the same
+    changelog. Re-send only when the notes actually changed (e.g. it was
+    regenerated with a different provider), or when the tag was never notified
+    (first generation, or the previous attempt failed).
+    """
+    if not absorbed.already_notified:
+        return True
+    return (absorbed.previous_markdown or "") != (new_markdown or "")
+
 
 
 def _apply_result(target: ChangelogModel, result: ChangelogModel) -> None:
@@ -121,14 +159,23 @@ async def run_changelog_generation(changelog_id: str) -> None:
             #    (repo, tag) — e.g. the repo hasn't changed since last time —
             #    absorb it first (keeping our row, which the UI is polling, and
             #    carrying its publish state), then write.
-            await _absorb_duplicate_tag_row(db, changelog, result.to_tag)
+            absorbed = await _absorb_duplicate_tag_row(db, changelog, result.to_tag)
             _apply_result(changelog, result)
             await db.commit()
 
-            # 6. Send notification (best-effort — never fails the generation)
-            outcome = await NotificationService().notify_for_changelog(changelog, db)
-            changelog.notification_status = outcome
-            await db.commit()
+            # 6. Send notification (best-effort — never fails the generation).
+            #    Skip it when this exact tag was already delivered and the notes
+            #    are unchanged: regenerating an untouched repo is not news.
+            if should_notify(absorbed, changelog.raw_markdown):
+                outcome = await NotificationService().notify_for_changelog(changelog, db)
+                changelog.notification_status = outcome
+                await db.commit()
+            else:
+                outcome = changelog.notification_status
+                logger.info(
+                    "Changelog %s: tag %s already notified (%s) and content unchanged — not re-sending",
+                    changelog_id, changelog.to_tag, outcome,
+                )
 
             logger.info(
                 "Changelog %s completed (notification: %s)",

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import base64
@@ -10,6 +11,38 @@ from git import Repo as GitRepo
 from git.exc import GitCommandError
 
 logger = logging.getLogger(__name__)
+
+
+# A tag shaped like an abbreviated commit SHA — what this tool itself publishes
+# for push-generated changelogs (GitHub rejects full 40/64-hex tag names).
+_SHA_TAG_RE = re.compile(r"^[0-9a-f]{7,40}$")
+# v1.2.3 / 1.2 / v0.1 — the "real" version tags.
+_SEMVER_TAG_RE = re.compile(r"^v?\d+(\.\d+)*$")
+
+
+def _is_version_tag(name: str) -> bool:
+    """Can this tag serve as a release anchor for a changelog range?
+
+    Deliberately *not* `name[0].isdigit()`: that admitted digit-initial SHA tags
+    (`0567761`) while silently dropping letter-initial ones (`f2cf1ae`), even
+    though both are real releases created by this tool — so the same repo got
+    different range picks depending on the first character of a commit hash.
+    Tag shape is now classified explicitly, so every tag is treated the same way.
+    """
+    if not name:
+        return False
+    return bool(_SEMVER_TAG_RE.match(name)) or bool(_SHA_TAG_RE.match(name.lower()))
+
+
+def _tag_sort_rank(name: str) -> int:
+    """Tie-break rank: SHA-style tags sort before human version tags.
+
+    Used only when two tags point at the same commit (e.g. `0567761` and
+    `v1.0.0`), where the readable version should win as "latest". Note this must
+    be checked *before* the semver test: a bare hash like `0567761` is also a
+    valid `\\d+` "version", and treating it as one flipped the winner.
+    """
+    return 0 if _SHA_TAG_RE.match(name.lower()) else 1
 
 
 def _semver_sort_key(tag: str) -> list[tuple[int, int | str]]:
@@ -29,6 +62,7 @@ def _semver_sort_key(tag: str) -> list[tuple[int, int | str]]:
     ]
 
 
+
 class GitClient:
     """Wrapper around git operations for the changelog tool."""
 
@@ -43,6 +77,19 @@ class GitClient:
             self._repo = GitRepo(self.repo_path)
         return self._repo
 
+    def _tag_commit_time(self, name: str) -> int | None:
+        """Commit timestamp for a tag, or None when it can't be resolved.
+
+        Works for lightweight and annotated tags (GitPython dereferences to the
+        commit). Returns None for tags pointing at non-commit objects (tree/blob)
+        so one odd tag can't break range resolution.
+        """
+        try:
+            return int(self.repo.tags[name].commit.committed_date)
+        except Exception:
+            logger.warning("resolve_tags: could not resolve tag %s — skipping", name, exc_info=True)
+            return None
+
     def resolve_tags(self, from_tag: str | None = None, to_tag: str | None = None) -> tuple[str, str]:
         """
         Resolve the 'from' and 'to' tags.
@@ -56,19 +103,36 @@ class GitClient:
             return from_tag, to_tag
 
         all_tag_names = [t.name for t in self.repo.tags if t.name]
-        tags = sorted(
-            [t for t in all_tag_names if t.startswith("v") or (t and t[0].isdigit())],
-            key=_semver_sort_key,
-        )
-        ignored = len(all_tag_names) - len(tags)
+        candidates = [t for t in all_tag_names if _is_version_tag(t)]
+        ignored = len(all_tag_names) - len(candidates)
         if ignored:
             logger.info(
-                "resolve_tags: ignoring %d non-semver tag(s) (only v*/digit tags used)",
+                "resolve_tags: ignoring %d tag(s) that are neither semver nor SHA shaped",
                 ignored,
             )
 
-        latest = tags[-1] if tags else "HEAD"
-        previous = tags[-2] if len(tags) >= 2 else (tags[-1] if tags else None)
+        # Order by *commit time*, never by tag text. SHA tags have no meaningful
+        # lexical order, so sorting them as strings ("23cf490" > "1f21a87")
+        # picked an arbitrary — often older — tag as "latest", producing a
+        # changelog for the wrong range. Timestamps are the only ordering that
+        # holds for every naming scheme; between tags on the same commit the
+        # semver one wins (a human-readable version beats a bare hash).
+        dated: list[tuple[int, int, list[tuple[int, int | str]], str]] = []
+        for name in candidates:
+            ts = self._tag_commit_time(name)
+            if ts is None:
+                continue
+            dated.append((ts, _tag_sort_rank(name), _semver_sort_key(name), name))
+        dated.sort()
+        ordered = [name for _, _, _, name in dated]
+
+        latest = ordered[-1] if ordered else "HEAD"
+        previous = ordered[-2] if len(ordered) >= 2 else (ordered[-1] if ordered else None)
+        if ordered:
+            logger.info(
+                "resolve_tags: %d candidate tag(s), latest=%s previous=%s",
+                len(ordered), latest, previous,
+            )
         return from_tag or previous, to_tag or latest
 
     def is_ancestor(self, ancestor_ref: str, descendant_ref: str = "HEAD") -> bool:

@@ -16,7 +16,12 @@ from app.database import Base
 from app.models.changelog import Changelog
 from app.models.repo import Repository
 from app.models.user import User
-from app.tasks.worker import _absorb_duplicate_tag_row, _apply_result
+from app.tasks.worker import (
+    AbsorbedDuplicates,
+    _absorb_duplicate_tag_row,
+    _apply_result,
+    should_notify,
+)
 
 # Resolve User's relationships for mapper configuration.
 import app.models.user_config  # noqa: F401
@@ -121,3 +126,77 @@ async def test_unresolved_tag_absorbs_nothing(db):
     await db.commit()
 
     assert len((await db.execute(select(Changelog))).scalars().all()) == 2
+
+
+@pytest.mark.asyncio
+async def test_regenerate_carries_notification_state(db):
+    """An unchanged regenerate must not re-notify the same tag."""
+    repo = await _repo(db)
+    db.add(Changelog(
+        user_id=repo.user_id, repo_id=repo.id, to_tag="HEAD (unreleased)",
+        status="completed", raw_markdown="old notes", notification_status="sent",
+    ))
+    await db.commit()
+    new = Changelog(user_id=repo.user_id, repo_id=repo.id, status="pending")
+    db.add(new)
+    await db.commit()
+
+    result = _result_row(repo, "HEAD (unreleased)", "old notes")
+    absorbed = await _absorb_duplicate_tag_row(db, new, result.to_tag)
+    _apply_result(new, result)
+    await db.commit()
+
+    assert absorbed.already_notified is True
+    assert absorbed.previous_markdown == "old notes"
+    assert new.notification_status == "sent"                   # carried, not reset
+    assert should_notify(absorbed, new.raw_markdown) is False  # identical notes
+
+
+@pytest.mark.asyncio
+async def test_regenerate_with_changed_content_notifies_again(db):
+    """Regenerating different notes IS news — send it."""
+    repo = await _repo(db)
+    db.add(Changelog(
+        user_id=repo.user_id, repo_id=repo.id, to_tag="HEAD (unreleased)",
+        status="completed", raw_markdown="old notes", notification_status="sent",
+    ))
+    await db.commit()
+    new = Changelog(user_id=repo.user_id, repo_id=repo.id, status="pending")
+    db.add(new)
+    await db.commit()
+
+    result = _result_row(repo, "HEAD (unreleased)", "corrected notes")
+    absorbed = await _absorb_duplicate_tag_row(db, new, result.to_tag)
+    _apply_result(new, result)
+    await db.commit()
+
+    assert should_notify(absorbed, new.raw_markdown) is True
+
+
+@pytest.mark.asyncio
+async def test_failed_notification_is_retried(db):
+    """A previously failed send must be retried, not treated as delivered."""
+    repo = await _repo(db)
+    db.add(Changelog(
+        user_id=repo.user_id, repo_id=repo.id, to_tag="HEAD (unreleased)",
+        status="completed", raw_markdown="old notes", notification_status="failed",
+    ))
+    await db.commit()
+    new = Changelog(user_id=repo.user_id, repo_id=repo.id, status="pending")
+    db.add(new)
+    await db.commit()
+
+    result = _result_row(repo, "HEAD (unreleased)", "old notes")
+    absorbed = await _absorb_duplicate_tag_row(db, new, result.to_tag)
+    _apply_result(new, result)
+    await db.commit()
+
+    assert absorbed.already_notified is False
+    assert new.notification_status is None
+    assert should_notify(absorbed, new.raw_markdown) is True
+
+
+def test_should_notify_first_generation():
+    """No absorbed duplicates → always notify."""
+    assert should_notify(AbsorbedDuplicates(), "notes") is True
+
