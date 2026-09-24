@@ -44,6 +44,16 @@ export interface PublicPage {
   changelogs: PublicChangelog[]
 }
 
+export interface SubscribeResult {
+  status: 'pending_confirmation' | 'already_subscribed'
+  message: string
+}
+
+export interface TokenActionResult {
+  status: 'confirmed' | 'unsubscribed' | 'not_found'
+  message: string
+}
+
 export type ChangelogStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type NotificationStatus = 'sent' | 'skipped' | 'failed' | null
 

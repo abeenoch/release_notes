@@ -2,10 +2,11 @@ const BASE = '/api'
 
 import type {
   User, Repository, Changelog, ChangelogListResponse,
-  LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus, PublicPage,
+  LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus,
+  PublicPage, SubscribeResult, TokenActionResult,
 } from './types'
 
-export type { User, Repository, Changelog, ChangelogListResponse, LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus, PublicPage }
+export type { User, Repository, Changelog, ChangelogListResponse, LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus, PublicPage, SubscribeResult, TokenActionResult }
 
 function getToken(): string | null {
   return localStorage.getItem('arn_token')
@@ -72,6 +73,17 @@ export const reposApi = {
 export const publicApi = {
   getPage: (owner: string, repo: string) =>
     request<PublicPage>('GET', `/public/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`),
+  /** Double opt-in: starts a subscription (confirmation mail is sent). */
+  subscribe: (owner: string, repo: string, email: string) =>
+    request<SubscribeResult>(
+      'POST',
+      `/public/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/subscribe`,
+      { email },
+    ),
+  confirm: (token: string) =>
+    request<TokenActionResult>('GET', `/public/confirm/${encodeURIComponent(token)}`),
+  unsubscribe: (token: string) =>
+    request<TokenActionResult>('GET', `/public/unsubscribe/${encodeURIComponent(token)}`),
 }
 
 export const changelogApi = {

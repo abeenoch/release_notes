@@ -4,6 +4,7 @@ import { Loader2, FileText, Github } from 'lucide-react'
 import { publicApi } from '../lib'
 import { renderMarkdown } from '../lib/markdown'
 import { RelativeDate } from '../components/StatusBadge'
+import { SubscribeCard } from '../components/SubscribeCard'
 import type { PublicPage as PublicPageData } from '../lib'
 
 /**
@@ -76,6 +77,7 @@ export function PublicChangelogPage() {
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
+        <SubscribeCard owner={owner ?? ''} repo={repo ?? ''} />
         {page.changelogs.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <FileText size={36} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />

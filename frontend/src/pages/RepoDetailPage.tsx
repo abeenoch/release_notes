@@ -157,6 +157,11 @@ export function RepoDetailPage() {
                   : 'ON — anyone with the link can read this repository’s completed changelogs.'
                 : 'OFF — only you can see these changelogs.'}
             </p>
+            {repo.public_enabled && (
+              <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
+                Confirmed subscribers get each release by email via your notification settings.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {repo.public_enabled && (

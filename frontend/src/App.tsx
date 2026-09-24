@@ -13,6 +13,7 @@ import { setToken, hasToken, authApi } from './lib'
 import { ThemeToggle } from './components/ThemeToggle'
 import { LoginPage } from './pages/LoginPage'
 import { PublicChangelogPage } from './pages/PublicChangelogPage'
+import { TokenActionPage } from './pages/TokenActionPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ReposPage } from './pages/ReposPage'
 import { RepoDetailPage } from './pages/RepoDetailPage'
@@ -169,6 +170,9 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         {/* Public vanity changelog page — /owner/repo, deliberately unauthenticated */}
         <Route path="/:owner/:repo" element={<PublicChangelogPage />} />
+        {/* Links from confirmation/unsubscription emails — also public */}
+        <Route path="/confirm/:token" element={<TokenActionPage action="confirm" />} />
+        <Route path="/unsubscribe/:token" element={<TokenActionPage action="unsubscribe" />} />
         <Route element={<RequireAuth />}>
           <Route index element={<DashboardPage />} />
           <Route path="repos" element={<ReposPage />} />

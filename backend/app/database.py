@@ -32,6 +32,7 @@ _CHANGELOG_ADDITIONS: dict[str, str] = {
     "status": "VARCHAR(20) DEFAULT 'pending' NOT NULL",
     "error_message": "TEXT",
     "notification_status": "VARCHAR(20)",
+    "subscriber_status": "VARCHAR(20)",
     "release_id": "INTEGER",
     "release_url": "VARCHAR(500)",
     "published_at": "DATETIME",

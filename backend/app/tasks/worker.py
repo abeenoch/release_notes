@@ -169,6 +169,13 @@ async def run_changelog_generation(changelog_id: str) -> None:
             if should_notify(absorbed, changelog.raw_markdown):
                 outcome = await NotificationService().notify_for_changelog(changelog, db)
                 changelog.notification_status = outcome
+                # Fan-out to public-page subscribers through the OWNER's own
+                # SMTP/SendGrid config — independent of the owner's own mail,
+                # and gated by the same "is this news?" decision.
+                from app.services.subscriber_service import SubscriberService
+                changelog.subscriber_status = await SubscriberService().notify_subscribers(
+                    changelog, db
+                )
                 await db.commit()
             else:
                 outcome = changelog.notification_status

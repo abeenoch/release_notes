@@ -126,3 +126,34 @@ class PublicPageResponse(BaseModel):
     full_name: str
     is_private: bool
     changelogs: list[PublicChangelogResponse]
+
+
+# ── Subscribers (double opt-in, owner's own SMTP/SendGrid sends) ──────
+
+import re as _re
+
+_EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class SubscribeRequest(BaseModel):
+    """Body for POST /public/{owner}/{repo}/subscribe — normalized lowercase."""
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def _check(cls, v: str) -> str:
+        v = v.strip().lower()
+        if len(v) > 255 or not _EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address")
+        return v
+
+
+class SubscribeResponse(BaseModel):
+    status: str  # pending_confirmation | already_subscribed
+    message: str
+
+
+class TokenActionResponse(BaseModel):
+    """Confirm/unsubscribe outcomes — always 200 so the SPA can render any."""
+    status: str  # confirmed | unsubscribed | not_found
+    message: str

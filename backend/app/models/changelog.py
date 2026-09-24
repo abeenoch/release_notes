@@ -45,6 +45,11 @@ class Changelog(Base):
         String(20), nullable=True
     )  # None | sent | skipped | failed
 
+    # Fan-out to public-page subscribers (sent via the OWNER's notify config).
+    subscriber_status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )  # None | sent | partial | skipped | failed
+
     # GitHub Release publish state. Publishing is create-once and idempotent:
     # these fields let us tell "already published" from "not yet published"
     # without calling GitHub, and stop accidental re-publishes from rewriting

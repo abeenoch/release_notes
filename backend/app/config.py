@@ -61,5 +61,11 @@ class Settings:
     webhook_path: str = os.getenv("WEBHOOK_PATH", "/webhook")
     webhook_base_url: Optional[str] = os.getenv("WEBHOOK_BASE_URL")
 
+    # Absolute origin for links we put IN emails (confirm/unsubscribe).
+    # Falls back to the webhook base URL — same public origin in practice.
+    public_base_url: Optional[str] = (
+        os.getenv("PUBLIC_BASE_URL") or os.getenv("WEBHOOK_BASE_URL") or "http://localhost:8003"
+    )
+
 
 settings = Settings()
