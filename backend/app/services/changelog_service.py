@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 
 from sqlalchemy import select
@@ -29,6 +27,23 @@ def _fix_changelog_heading(markdown: str, version: str) -> str:
     return f"{heading}\n\n{markdown}"
 
 
+def repo_work_dir(user_id: str, repo: Repository) -> Path:
+    """Absolute per-user clone directory.
+
+    Shared by generation and the API's manual-range ref validation, and
+    resolved to an absolute path so systemd/uvicorn invocations from
+    different CWDs all land in the same directory.
+    """
+    base_dir = Path(settings.clone_work_dir)
+    if not base_dir.is_absolute():
+        data_dir = Path(settings.data_dir)
+        if not data_dir.is_absolute():
+            # config.py defaults are relative to backend/ root
+            data_dir = Path(__file__).resolve().parent.parent.parent / data_dir
+        base_dir = (data_dir / base_dir.name).resolve() if base_dir.name else data_dir.resolve()
+    return base_dir / user_id / repo.full_name.replace("/", "_")
+
+
 class ChangelogService:
     """Orchestrate changelog generation from git tags through LLM."""
 
@@ -52,16 +67,8 @@ class ChangelogService:
         4. Call LLM (or commit parser)
         5. Return result
         """
-        # 1. Clone / pull the repo. Resolve the work dir to an absolute path
-        # so systemd/uvicorn invocations from different CWDs share one dir.
-        base_dir = Path(settings.clone_work_dir)
-        if not base_dir.is_absolute():
-            data_dir = Path(settings.data_dir)
-            if not data_dir.is_absolute():
-                # config.py defaults are relative to backend/ root
-                data_dir = Path(__file__).resolve().parent.parent.parent / data_dir
-            base_dir = (data_dir / base_dir.name).resolve() if base_dir.name else data_dir.resolve()
-        work_dir = base_dir / user.id / repo.full_name.replace("/", "_")
+        # 1. Clone / pull the repo (work dir shared with API ref validation)
+        work_dir = repo_work_dir(user.id, repo)
         work_dir.mkdir(parents=True, exist_ok=True)
 
         if repo.clone_url:

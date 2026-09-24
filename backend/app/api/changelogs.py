@@ -15,7 +15,8 @@ from app.schemas.changelog import (
     ChangelogTriggerRequest, ChangelogResponse, ChangelogListResponse,
     ChangelogStatsResponse,
 )
-from app.services.changelog_service import ChangelogService
+from app.services.changelog_service import ChangelogService, repo_work_dir
+from app.services.git_ops import ref_exists, validate_ref_shape
 from app.services import publish_service
 from app.services.github import GitHubApiError
 from app.tasks.worker import run_changelog_generation
@@ -249,6 +250,39 @@ async def generate_changelog(
     repo = result.scalar_one_or_none()
     if not repo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    # ── Manual range validation (fail before anything is queued) ──
+    if body.from_tag or body.to_tag:
+        if not (body.from_tag and body.to_tag):
+            # Partial ranges were previously *silently ignored* by the service
+            # (it only honors an explicit range when both ends are given) —
+            # now they're a clear 400 instead of a wrong changelog.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide both from_tag and to_tag, or neither "
+                       "(omit both for the default incremental range)",
+            )
+        for label, ref in (("from_tag", body.from_tag), ("to_tag", body.to_tag)):
+            err = validate_ref_shape(ref)
+            if err:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid {label}: {err}",
+                )
+        # If the repo is already cloned, verify the refs actually exist here
+        # so a typo 400s immediately. No clone yet → skip: the worker will
+        # report an unknown ref as a normal (visible) generation failure.
+        work_dir = repo_work_dir(user.id, repo)
+        if (work_dir / ".git").exists():
+            missing = [
+                r for r in (body.from_tag, body.to_tag)
+                if not ref_exists(work_dir, r)
+            ]
+            if missing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unknown ref(s) in this repository: {', '.join(missing)}",
+                )
 
     # Create a pending record so the frontend can immediately show it
     changelog = ChangelogModel(

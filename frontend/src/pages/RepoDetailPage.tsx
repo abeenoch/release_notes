@@ -12,6 +12,10 @@ export function RepoDetailPage() {
   const [repoName, setRepoName] = useState('')
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [fromTag, setFromTag] = useState('')
+  const [toTag, setToTag] = useState('')
+  const [rangeError, setRangeError] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
@@ -53,6 +57,32 @@ export function RepoDetailPage() {
     }
   }
 
+  const generateRange = async () => {
+    if (!repoId) return
+    const from = fromTag.trim()
+    const to = toTag.trim()
+    // Mirror the backend rule: both ends or neither — a partial range used
+    // to be silently ignored and produced the wrong changelog.
+    if (!from || !to) {
+      setRangeError('Fill in both From and To — for the default range use Generate Now instead.')
+      return
+    }
+    setGenerating(true)
+    setRangeError('')
+    try {
+      await changelogApi.generate({ repo_id: repoId, from_tag: from, to_tag: to })
+      setRangeOpen(false)
+      setFromTag('')
+      setToTag('')
+      await load()
+      pollRef.current = setInterval(load, 3000)
+    } catch (e) {
+      setRangeError((e as Error).message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -75,6 +105,12 @@ export function RepoDetailPage() {
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{changelogs.length} changelogs</p>
         </div>
         <button
+          onClick={() => { setRangeOpen((v) => !v); setRangeError('') }}
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          Range…
+        </button>
+        <button
           onClick={generate}
           disabled={generating}
           className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
@@ -83,6 +119,44 @@ export function RepoDetailPage() {
           {generating ? 'Queuing…' : 'Generate Now'}
         </button>
       </div>
+
+      {rangeOpen && (
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="min-w-[10rem] flex-1">
+              <span className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">From ref</span>
+              <input
+                value={fromTag}
+                onChange={(e) => { setFromTag(e.target.value); setRangeError('') }}
+                placeholder="v1.0.0 or commit"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+              />
+            </label>
+            <label className="min-w-[10rem] flex-1">
+              <span className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">To ref</span>
+              <input
+                value={toTag}
+                onChange={(e) => { setToTag(e.target.value); setRangeError('') }}
+                placeholder="v1.1.0 or commit"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+              />
+            </label>
+            <button
+              onClick={generateRange}
+              disabled={generating}
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              {generating ? 'Queuing…' : 'Generate range'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Covers exactly From → To (e.g. <span className="font-mono">v1.0.0</span> → <span className="font-mono">v1.1.0</span>). Use Generate Now for the default incremental range.
+          </p>
+          {rangeError && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{rangeError}</p>
+          )}
+        </div>
+      )}
 
       {changelogs.length === 0 ? (
         <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">

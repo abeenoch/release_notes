@@ -62,6 +62,42 @@ def _semver_sort_key(tag: str) -> list[tuple[int, int | str]]:
     ]
 
 
+def validate_ref_shape(ref: str) -> str | None:
+    """Syntactic screen for a user-supplied ref (manual range trigger).
+
+    Returns an error message when `ref` cannot possibly be a git ref name,
+    else None. Deliberately cheap — it runs before anything is queued. Real
+    existence is checked against the local clone by ref_exists when one
+    exists; otherwise the worker surfaces an unknown ref as a normal
+    generation failure.
+    """
+    if not ref:
+        return "is empty"
+    if len(ref) > 255:
+        return "is longer than 255 characters"
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in ref):
+        return "contains whitespace or control characters"
+    if ref.startswith(("-", ".")) or ref.endswith((".", ".lock", "/")):
+        return "starts or ends with an invalid character"
+    if ".." in ref or "@{" in ref or "//" in ref:
+        return "contains '..', '@{' or '//'"
+    if any(ch in ref for ch in "~^:?*[\\"):
+        return "contains git-special characters (~ ^ : ? * [ \\)"
+    return None
+
+
+def ref_exists(work_dir: Path, ref: str) -> bool:
+    """True when `ref` resolves to a commit in the clone at `work_dir`.
+
+    Read-only lookup (GitPython rev-parse under the hood); never fetches.
+    Returns False when the directory isn't a clone or the ref is unknown.
+    """
+    try:
+        GitRepo(str(work_dir)).commit(ref)
+        return True
+    except Exception:
+        return False
+
 
 class GitClient:
     """Wrapper around git operations for the changelog tool."""
