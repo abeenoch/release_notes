@@ -17,9 +17,31 @@ export interface Repository {
   default_branch?: string | null
   is_active: boolean
   is_private?: boolean | null
+  /** Public vanity page (/owner/repo) — strictly opt-in, off by default. */
+  public_enabled?: boolean | null
   last_generated_commit?: string | null
   created_at: string
   updated_at?: string | null
+}
+
+/** One completed changelog on a public page — no ids, no internals. */
+export interface PublicChangelog {
+  version: string | null
+  previous_version?: string | null
+  from_tag?: string | null
+  to_tag?: string | null
+  summary?: string | null
+  raw_markdown?: string | null
+  commit_count?: number | null
+  release_url?: string | null
+  published_at?: string | null
+  created_at: string
+}
+
+export interface PublicPage {
+  full_name: string
+  is_private: boolean
+  changelogs: PublicChangelog[]
 }
 
 export type ChangelogStatus = 'pending' | 'processing' | 'completed' | 'failed'

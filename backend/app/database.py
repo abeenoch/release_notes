@@ -109,6 +109,7 @@ async def _ensure_unique_changelog_index(conn) -> None:
 
 _REPO_ADDITIONS: dict[str, str] = {
     "last_generated_commit": "VARCHAR(40)",
+    "public_enabled": "BOOLEAN NOT NULL DEFAULT 0",
 }
 
 

@@ -11,7 +11,7 @@ from app.models.repo import Repository
 from app.schemas.repo import (
     RepoCreate, RepoResponse, RepoListResponse,
     RepoToggleActive, GitHubRepoPreview, GitHubRepoListResponse,
-    RepoImportRequest,
+    RepoImportRequest, RepoPublicUpdate,
 )
 from app.services.github import GitHubClient
 from app.config import settings
@@ -39,6 +39,7 @@ async def list_repos(
             default_branch=r.default_branch,
             is_active=r.is_active,
             is_private=r.is_private,
+            public_enabled=r.public_enabled,
             created_at=r.created_at,
         )
         for r in repos
@@ -143,6 +144,7 @@ async def sync_github_repos(
             default_branch=r.default_branch,
             is_active=r.is_active,
             is_private=r.is_private,
+            public_enabled=r.public_enabled,
             created_at=r.created_at,
         )
         for r in synced
@@ -229,6 +231,7 @@ async def import_selected_repos(
             default_branch=r.default_branch,
             is_active=r.is_active,
             is_private=r.is_private,
+            public_enabled=r.public_enabled,
             created_at=r.created_at,
         )
         for r in imported
@@ -285,6 +288,42 @@ async def toggle_repo_active(
         default_branch=repo.default_branch,
         is_active=repo.is_active,
         is_private=repo.is_private,
+        public_enabled=repo.public_enabled,
+        created_at=repo.created_at,
+    )
+
+
+@router.patch("/{repo_id}/public", response_model=RepoResponse)
+async def set_repo_public_page(
+    repo_id: str,
+    body: RepoPublicUpdate,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Opt a repo's public vanity page (/owner/repo) in or out.
+
+    Strictly owner-scoped and OFF by default — enabling it is what makes
+    completed changelogs world-readable via GET /public/{owner}/{repo}.
+    """
+    result = await db.execute(
+        select(Repository).where(
+            Repository.id == repo_id,
+            Repository.user_id == user_id,
+        )
+    )
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    repo.public_enabled = body.enabled
+    await db.flush()
+    await db.commit()
+    return RepoResponse(
+        id=repo.id,
+        full_name=repo.full_name,
+        default_branch=repo.default_branch,
+        is_active=repo.is_active,
+        is_private=repo.is_private,
+        public_enabled=repo.public_enabled,
         created_at=repo.created_at,
     )
 

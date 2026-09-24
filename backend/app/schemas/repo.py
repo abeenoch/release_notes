@@ -19,6 +19,11 @@ class RepoToggleActive(BaseModel):
     is_active: bool | None = None
 
 
+class RepoPublicUpdate(BaseModel):
+    """Body for enabling/disabling the public vanity changelog page."""
+    enabled: bool
+
+
 class RepoImportRequest(BaseModel):
     """Body for importing selected repos from GitHub."""
     full_names: list[str]
@@ -51,6 +56,7 @@ class RepoResponse(BaseModel):
     default_branch: str
     is_active: bool
     is_private: bool
+    public_enabled: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

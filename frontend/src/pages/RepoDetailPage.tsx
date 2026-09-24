@@ -3,26 +3,28 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Loader2, Sparkles, ArrowLeft, GitBranch } from 'lucide-react'
 import { reposApi, changelogApi } from '../lib'
 import { StatusBadge, RelativeDate } from '../components/StatusBadge'
-import type { Changelog } from '../lib'
+import type { Changelog, Repository } from '../lib'
 
 export function RepoDetailPage() {
   const { repoId } = useParams()
   const navigate = useNavigate()
   const [changelogs, setChangelogs] = useState<Changelog[]>([])
-  const [repoName, setRepoName] = useState('')
+  const [repo, setRepo] = useState<Repository | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [rangeOpen, setRangeOpen] = useState(false)
   const [fromTag, setFromTag] = useState('')
   const [toTag, setToTag] = useState('')
   const [rangeError, setRangeError] = useState('')
+  const [savingPublic, setSavingPublic] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
     if (!repoId) return
     try {
       const repos = (await reposApi.list()).repos
-      setRepoName(repos.find((r) => r.id === repoId)?.full_name ?? 'Unknown')
+      setRepo(repos.find((r) => r.id === repoId) ?? null)
       const res = await changelogApi.list(repoId)
       setChangelogs(res.changelogs)
       const busy = res.changelogs.some((c) => c.status === 'pending' || c.status === 'processing')
@@ -83,6 +85,30 @@ export function RepoDetailPage() {
     }
   }
 
+  const togglePublic = async () => {
+    if (!repo) return
+    setSavingPublic(true)
+    try {
+      const updated = await reposApi.setPublic(repo.id, !repo.public_enabled)
+      setRepo({ ...repo, public_enabled: updated.public_enabled })
+    } catch (e) {
+      alert(`Could not update public page: ${(e as Error).message}`)
+    } finally {
+      setSavingPublic(false)
+    }
+  }
+
+  const copyPublicLink = async () => {
+    if (!repo) return
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/${repo.full_name}`)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 1500)
+    } catch {
+      /* clipboard unavailable (http origin / denied) — link stays clickable */
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -101,7 +127,7 @@ export function RepoDetailPage() {
           <ArrowLeft size={18} />
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="break-words text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{repoName}</h1>
+          <h1 className="break-words text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{repo?.full_name ?? 'Unknown'}</h1>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{changelogs.length} changelogs</p>
         </div>
         <button
@@ -119,6 +145,52 @@ export function RepoDetailPage() {
           {generating ? 'Queuing…' : 'Generate Now'}
         </button>
       </div>
+
+      {repo && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Public changelog page</p>
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {repo.public_enabled
+                ? repo.is_private
+                  ? 'ON — anyone with the link can read these changelogs, even though the repository is private.'
+                  : 'ON — anyone with the link can read this repository’s completed changelogs.'
+                : 'OFF — only you can see these changelogs.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {repo.public_enabled && (
+              <>
+                <a
+                  href={`${window.location.origin}/${repo.full_name}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="max-w-[16rem] truncate rounded-lg bg-zinc-100 px-2.5 py-1.5 font-mono text-xs text-zinc-700 hover:text-brand-600 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {window.location.origin}/{repo.full_name}
+                </a>
+                <button
+                  onClick={copyPublicLink}
+                  className="rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  {copiedLink ? 'Copied' : 'Copy'}
+                </button>
+              </>
+            )}
+            <button
+              onClick={togglePublic}
+              disabled={savingPublic}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                repo.public_enabled
+                  ? 'border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950'
+                  : 'bg-brand-600 text-white hover:bg-brand-700'
+              }`}
+            >
+              {savingPublic ? 'Saving…' : repo.public_enabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {rangeOpen && (
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">

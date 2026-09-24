@@ -2,10 +2,10 @@ const BASE = '/api'
 
 import type {
   User, Repository, Changelog, ChangelogListResponse,
-  LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus,
+  LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus, PublicPage,
 } from './types'
 
-export type { User, Repository, Changelog, ChangelogListResponse, LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus }
+export type { User, Repository, Changelog, ChangelogListResponse, LlmConfig, NotifyConfig, ChangelogStatus, NotificationStatus, PublicPage }
 
 function getToken(): string | null {
   return localStorage.getItem('arn_token')
@@ -63,6 +63,15 @@ export const reposApi = {
   importRepos: (fullNames: string[]) =>
     request<{ repos: Repository[] }>('POST', '/repos/import', { full_names: fullNames }),
   remove: (id: string) => request<void>('DELETE', `/repos/${id}`),
+  /** Enable/disable the public vanity page (/owner/repo) for a repo. */
+  setPublic: (id: string, enabled: boolean) =>
+    request<Repository>('PATCH', `/repos/${id}/public`, { enabled }),
+}
+
+/** Unauthenticated access to a repo's public vanity changelog page. */
+export const publicApi = {
+  getPage: (owner: string, repo: string) =>
+    request<PublicPage>('GET', `/public/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`),
 }
 
 export const changelogApi = {

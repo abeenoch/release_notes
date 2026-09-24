@@ -27,6 +27,11 @@ class Repository(Base):
     default_branch: Mapped[str] = mapped_column(String(255), default="main")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_private: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Public vanity page (/owner/repo) — strictly opt-in, off by default so
+    # registering a (private) repo never accidentally publishes it.
+    public_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     last_cloned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Incremental changelog tracking: the HEAD commit covered by the last
     # generated changelog. Next push generates from this commit onward.

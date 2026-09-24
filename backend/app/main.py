@@ -17,6 +17,7 @@ from app.api.repos import router as repos_router
 from app.api.changelogs import router as changelogs_router
 from app.api.webhooks import router as webhooks_router
 from app.api.notify_routes import router as notify_router
+from app.api.public_pages import router as public_router
 
 
 @asynccontextmanager
@@ -68,6 +69,7 @@ app.include_router(repos_router, prefix="/api")
 app.include_router(changelogs_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api")
 app.include_router(notify_router, prefix="/api")
+app.include_router(public_router, prefix="/api")
 
 # ── Serve the pre-built React frontend from the dist/ directory ──
 _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

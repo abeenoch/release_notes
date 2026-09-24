@@ -98,3 +98,31 @@ class ChangelogStatsResponse(BaseModel):
     changelogs_completed: int
     changelogs_failed: int
     changelogs_published: int
+
+
+class PublicChangelogResponse(BaseModel):
+    """One completed changelog on a public page — no ids, no internals."""
+    version: str | None = None
+    previous_version: str | None = None
+    from_tag: str | None = None
+    to_tag: str | None = None
+    summary: str | None = None
+    raw_markdown: str | None = None
+    commit_count: int | None = None
+    release_url: str | None = None
+    published_at: datetime | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @field_validator("created_at", "published_at", mode="before")
+    @classmethod
+    def _utc(cls, v):
+        return _ensure_utc(v)
+
+
+class PublicPageResponse(BaseModel):
+    """Payload for GET /public/{owner}/{repo} — read-only, unauthenticated."""
+    full_name: str
+    is_private: bool
+    changelogs: list[PublicChangelogResponse]
