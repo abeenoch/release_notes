@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.database import init_db
@@ -61,6 +62,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class PublicApiCorsMiddleware(BaseHTTPMiddleware):
+    """Open CORS for /api/public/* ONLY — and only those endpoints are
+    already unauthenticated. This is what lets the embeddable widget fetch
+    a changelog page from a third-party site. Authenticated API paths keep
+    the strict cors_origins list untouched; responses never carry
+    credentials, so '*' is safe here."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/public"):
+            response.headers.setdefault("access-control-allow-origin", "*")
+        return response
+
+
+# Registered AFTER CORSMiddleware → runs OUTSIDE it, so the public-path
+# header is applied even when the origin isn't in cors_origins.
+app.add_middleware(PublicApiCorsMiddleware)
+
 # ── Register API routes (before static files to avoid conflicts) ──
 # Note: frontend expects /api prefix (e.g. POST /api/auth/github)
 app.include_router(health_router, prefix="/api")
@@ -101,6 +121,20 @@ if _frontend_dist.exists():
         favicon = _frontend_dist / "favicon.ico"
         if favicon.exists():
             return FileResponse(str(favicon), media_type="image/x-icon")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    @app.get("/widget.js", include_in_schema=False)
+    async def widget_js():
+        """Embeddable changelog widget (vanilla JS + shadow DOM).
+
+        Third-party sites include it via
+        <script src="…/widget.js" data-repo="owner/repo" async></script>;
+        it fetches /api/public/{owner}/{repo} (open CORS, see
+        PublicApiCorsMiddleware) and renders a styled release list.
+        """
+        widget = _frontend_dist / "widget.js"
+        if widget.exists():
+            return FileResponse(str(widget), media_type="application/javascript")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     @app.get("/{full_path:path}")

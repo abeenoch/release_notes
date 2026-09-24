@@ -109,6 +109,20 @@ export function RepoDetailPage() {
     }
   }
 
+  const embedSnippet = repo
+    ? `<script src="${window.location.origin}/widget.js" data-repo="${repo.full_name}" async></script>`
+    : ''
+
+  const copyEmbed = async () => {
+    try {
+      await navigator.clipboard.writeText(embedSnippet)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 1500)
+    } catch {
+      /* clipboard unavailable — snippet stays selectable */
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -163,8 +177,7 @@ export function RepoDetailPage() {
               </p>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {repo.public_enabled && (
+          <div className="flex flex-wrap items-center gap-2">            {repo.public_enabled && (
               <>
                 <a
                   href={`${window.location.origin}/${repo.full_name}`}
@@ -194,6 +207,21 @@ export function RepoDetailPage() {
               {savingPublic ? 'Saving…' : repo.public_enabled ? 'Disable' : 'Enable'}
             </button>
           </div>
+        </div>
+      )}
+
+      {repo?.public_enabled && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Embed on your site:</span>
+          <code className="min-w-0 flex-1 truncate rounded bg-zinc-100 px-2 py-1 font-mono text-[11px] text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            {embedSnippet}
+          </code>
+          <button
+            onClick={copyEmbed}
+            className="rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            {copiedLink ? 'Copied' : 'Copy'}
+          </button>
         </div>
       )}
 
