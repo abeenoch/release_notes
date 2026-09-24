@@ -39,26 +39,51 @@ def extract_tag_name(ref: str) -> str:
     return ref.removeprefix("refs/tags/")
 
 
-async def _queue_changelog_for_tag(
+async def _find_active_repos(
+    db: AsyncSession,
+    full_name: str,
+    github_repo_id: int | None = None,
+) -> list[Repository]:
+    """Every active registration this webhook event concerns.
+
+    Resolution order:
+      1. GitHub's numeric repository id — authoritative, survives renames,
+         and matches *every* user who registered the same repo (each
+         bringing their own GitHub token and notify config).
+      2. full_name — fallback for rows imported before github_repo_id
+         existed (or created outside the normal import path).
+    """
+    if github_repo_id is not None:
+        result = await db.execute(
+            select(Repository).where(
+                Repository.github_repo_id == github_repo_id,
+                Repository.is_active == True,  # noqa: E712
+            )
+        )
+        rows = list(result.scalars().all())
+        if rows:
+            return rows
+    result = await db.execute(
+        select(Repository).where(
+            Repository.full_name == full_name,
+            Repository.is_active == True,  # noqa: E712
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def _queue_for_repo(
     db: AsyncSession,
     background_tasks: BackgroundTasks,
-    full_name: str,
+    repo: Repository,
     tag_name: str,
 ) -> dict:
-    """Find the repo and queue a changelog generation.
+    """Queue one registration for `tag_name`.
 
     Idempotency: GitHub retries webhook deliveries, and concurrent retries
     can race past the pre-insert check. The (repo_id, to_tag) UNIQUE
     constraint is the final guard — IntegrityError maps to "ignored".
     """
-    result = await db.execute(
-        select(Repository)
-        .where(Repository.full_name == full_name)
-        .order_by(Repository.is_active.desc())
-    )
-    repo = result.scalars().first()
-    if not repo or not repo.is_active:
-        return {"status": "ignored", "message": f"Repository {full_name} not registered or inactive"}
 
     # Idempotency: GitHub retries webhook deliveries. Don't queue a duplicate
     # generation for the same tag while one is already pending/processing
@@ -145,6 +170,74 @@ async def _queue_changelog_for_tag(
     }
 
 
+async def _queue_changelog_for_tag(
+    db: AsyncSession,
+    background_tasks: BackgroundTasks,
+    full_name: str,
+    tag_name: str,
+    github_repo_id: int | None = None,
+) -> dict:
+    """Queue a changelog generation for *every* active registration.
+
+    Multiple users may register the same repository — each brings their own
+    GitHub token and notify config — so the webhook fans out to all of
+    them instead of silently letting "first active row wins" pick a
+    (possibly wrong) user's token. Single-registration responses keep the
+    original {status, message, changelog_id} shape.
+
+    Idempotency: GitHub retries webhook deliveries; each registration's
+    duplicate rules run independently, and the (repo_id, to_tag) UNIQUE
+    constraint is the final guard per repo.
+    """
+    repos = await _find_active_repos(db, full_name, github_repo_id)
+    if not repos:
+        return {"status": "ignored", "message": f"Repository {full_name} not registered or inactive"}
+
+    outcomes = [await _queue_for_repo(db, background_tasks, repo, tag_name) for repo in repos]
+    if len(outcomes) == 1:
+        # Preserve the original single-repo response shape.
+        return outcomes[0]
+    queued = [o for o in outcomes if o["status"] == "queued"]
+    return {
+        "status": "queued" if queued else "ignored",
+        "message": f"{len(queued)}/{len(outcomes)} registration(s) queued for {tag_name}",
+        "results": outcomes,
+    }
+
+
+async def _handle_push(
+    db: AsyncSession,
+    background_tasks: BackgroundTasks,
+    full_name: str,
+    github_repo_id: int | None,
+    ref: str,
+    head_sha: str,
+) -> dict:
+    """Push-event rules: registered? default branch? then queue everywhere.
+
+    Extracted from the webhook handler so multi-registration behavior is
+    unit-testable — the old inline query used scalar_one_or_none and
+    raised MultipleResultsFound the moment two users registered the
+    same repo.
+    """
+    repos = await _find_active_repos(db, full_name, github_repo_id)
+    if not repos:
+        return {"status": "ignored", "message": f"Repository {full_name} not registered"}
+
+    # Only trigger on push to the default branch (all registrations of the
+    # same upstream repo share it).
+    expected_ref = f"refs/heads/{repos[0].default_branch}"
+    if ref != expected_ref:
+        return {
+            "status": "ignored",
+            "message": f"Push to {ref} (not default branch {expected_ref})",
+        }
+
+    if head_sha in ("0000000000000000000000000000000000000000", ""):
+        head_sha = "HEAD"
+    return await _queue_changelog_for_tag(db, background_tasks, full_name, head_sha, github_repo_id)
+
+
 @router.post("")
 async def receive_webhook(
     request: Request,
@@ -182,8 +275,10 @@ async def receive_webhook(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON")
 
     full_name: str | None = None
+    github_repo_id: int | None = None
     if "repository" in payload:
         full_name = payload["repository"].get("full_name")
+        github_repo_id = payload["repository"].get("id")
 
     if not full_name:
         return {"status": "ignored", "message": "Missing repository in payload"}
@@ -191,7 +286,7 @@ async def receive_webhook(
     # 1) Tag creation event
     if event == "create" and is_tag_ref(payload.get("ref", "")):
         tag_name = extract_tag_name(payload["ref"])
-        return await _queue_changelog_for_tag(db, background_tasks, full_name, tag_name)
+        return await _queue_changelog_for_tag(db, background_tasks, full_name, tag_name, github_repo_id)
 
     # 2) Release published event
     if event == "release" and payload.get("action") == "published":
@@ -201,32 +296,16 @@ async def receive_webhook(
             or (payload.get("repository", {}).get("pushed_at") and f"release-{payload['repository']['pushed_at']}")
             or f"release-{request.headers.get('x-github-delivery', 'unknown')}"
         )
-        return await _queue_changelog_for_tag(db, background_tasks, full_name, tag_name)
+        return await _queue_changelog_for_tag(db, background_tasks, full_name, tag_name, github_repo_id)
 
     # 3) Push event to default branch
     if event == "push":
-        ref = payload.get("ref", "")
-        # Find repo to get its default branch
-        result = await db.execute(
-            select(Repository).where(Repository.full_name == full_name)
-        )
-        repo = result.scalar_one_or_none()
-        if not repo:
-            return {"status": "ignored", "message": f"Repository {full_name} not registered"}
-
-        # Only trigger on push to the default branch
-        expected_ref = f"refs/heads/{repo.default_branch}"
-        if ref != expected_ref:
-            return {
-                "status": "ignored",
-                "message": f"Push to {ref} (not default branch {expected_ref})",
-            }
-
-        # Use the FULL HEAD commit SHA as the version identifier (never the
-        # 7-char prefix — short SHAs can collide across pushes).
+        # FULL HEAD commit SHA as the version identifier (never the 7-char
+        # prefix — short SHAs can collide across pushes).
         head_sha = payload.get("head_commit", {}).get("id", "") or payload.get("after", "") or "HEAD"
-        if head_sha in ("0000000000000000000000000000000000000000", ""):
-            head_sha = "HEAD"
-        return await _queue_changelog_for_tag(db, background_tasks, full_name, head_sha)
+        return await _handle_push(
+            db, background_tasks, full_name, github_repo_id,
+            ref=payload.get("ref", ""), head_sha=head_sha,
+        )
 
     return {"status": "ignored", "message": "Not a tag, release, or default-branch push event"}
