@@ -28,7 +28,13 @@ export function StatusBadge({
     <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
       <Check size={12} />
       Done
-      {notificationStatus === 'sent' && <Check size={12} className="text-emerald-500" />}
+      {/* Notification feedback used to render as a SECOND check mark, which
+          read as a duplicate glyph ("✓ Done ✓"). Keep it as text instead. */}
+      {notificationStatus === 'sent' && (
+        <span className="font-normal opacity-70" title="Subscriber notification sent">
+          · notified
+        </span>
+      )}
     </span>
   )
 }
