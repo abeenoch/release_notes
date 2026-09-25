@@ -13,17 +13,18 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.api.public_pages import get_public_page
-from app.api.repos import set_repo_public_page
-from app.database import Base
+import app.models.changelog  # noqa: F401
+import app.models.notify_config  # noqa: F401
+import app.models.repo  # noqa: F401
+
 # Import every model module: User's relationships resolve by class name, so
 # the mapper needs them all registered (this file doesn't transitively
 # import user_config/notify_config like the API-heavy test modules do).
 import app.models.user  # noqa: F401
-import app.models.repo  # noqa: F401
-import app.models.changelog  # noqa: F401
 import app.models.user_config  # noqa: F401
-import app.models.notify_config  # noqa: F401
+from app.api.public_pages import get_public_page
+from app.api.repos import set_repo_public_page
+from app.database import Base
 from app.models.changelog import Changelog
 from app.models.repo import Repository
 from app.models.user import User

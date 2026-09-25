@@ -1,16 +1,14 @@
 """Embeddable widget: /widget.js served, CORS open ONLY for /api/public/*."""
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import app.models.user  # noqa: F401 — register mappers
-import app.models.repo  # noqa: F401
 import app.models.changelog  # noqa: F401
-import app.models.user_config  # noqa: F401
 import app.models.notify_config  # noqa: F401
+import app.models.repo  # noqa: F401
 import app.models.subscriber  # noqa: F401
-
+import app.models.user  # noqa: F401 — register mappers
+import app.models.user_config  # noqa: F401
 from app.core.dependencies import get_db
 from app.database import Base
 from app.main import app

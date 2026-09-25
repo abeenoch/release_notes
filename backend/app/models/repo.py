@@ -3,15 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, List
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.mixins import uuid_column
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.changelog import Changelog
+    from app.models.user import User
 
 
 class Repository(Base):
@@ -21,8 +21,10 @@ class Repository(Base):
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    github_repo_id: Mapped[int | None] = mapped_column(nullable=True)
-    full_name: Mapped[str] = mapped_column(String(500), nullable=False)  # e.g. "owner/repo"
+    # Webhook + public-page lookup keys (hot paths): github_repo_id is the
+    # authoritative match (survives renames), full_name the legacy fallback.
+    github_repo_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    full_name: Mapped[str] = mapped_column(String(500), nullable=False, index=True)  # "owner/repo"
     clone_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     default_branch: Mapped[str] = mapped_column(String(255), default="main")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decrypt_api_key
 from app.models.changelog import Changelog as ChangelogModel
 from app.models.notify_config import UserNotifyConfig
-from app.services.notify.factory import create_notify_provider
 from app.services.email_template import changelog_email_html
+from app.services.notify.factory import create_notify_provider
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +140,6 @@ class NotificationService:
                     cfg.provider,
                 )
             return outcome
-        except Exception as exc:
+        except Exception:
             logger.exception("Notification failed for changelog %s", changelog.id)
             return "failed"

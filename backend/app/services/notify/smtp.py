@@ -6,9 +6,9 @@ Ported from TypeScript src/notify/smtp.ts
 from __future__ import annotations
 
 import re
+from email.message import EmailMessage
 
 import aiosmtplib
-from email.message import EmailMessage
 
 from app.services.notify.base import NotifyProviderInterface
 

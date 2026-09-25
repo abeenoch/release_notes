@@ -1,7 +1,8 @@
 """Regression tests for the branded changelog email template."""
+from types import SimpleNamespace
+
 from app.services.email_template import changelog_email_html
 from app.services.notification_service import NotificationService
-from types import SimpleNamespace
 
 
 def test_logo_replaces_r_badge():

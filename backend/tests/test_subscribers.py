@@ -12,13 +12,12 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import app.models.user  # noqa: F401 — register all mappers (see test_public_pages)
-import app.models.repo  # noqa: F401
 import app.models.changelog  # noqa: F401
-import app.models.user_config  # noqa: F401
 import app.models.notify_config  # noqa: F401
+import app.models.repo  # noqa: F401
 import app.models.subscriber  # noqa: F401
-
+import app.models.user  # noqa: F401 — register all mappers (see test_public_pages)
+import app.models.user_config  # noqa: F401
 from app.api.public_pages import confirm_subscription, subscribe, unsubscribe
 from app.core.security import encrypt_api_key
 from app.database import Base
@@ -182,7 +181,7 @@ async def test_confirm_unknown_token(db):
 @pytest.mark.asyncio
 async def test_fanout_goes_only_to_confirmed(db, outbox):
     await _seed(db)
-    confirmed = await _subscribe_and_confirm(db, "confirmed@x.io")
+    await _subscribe_and_confirm(db, "confirmed@x.io")
     await subscribe("octocat", "hello", SubscribeRequest(email="pending@x.io"), db)
     outbox.sent.clear()  # ignore confirmation mails
 
@@ -199,7 +198,7 @@ async def test_fanout_goes_only_to_confirmed(db, outbox):
 @pytest.mark.asyncio
 async def test_unsubscribed_is_excluded_from_next_release(db, outbox):
     await _seed(db)
-    staying = await _subscribe_and_confirm(db, "staying@x.io")
+    await _subscribe_and_confirm(db, "staying@x.io")
     leaving = await _subscribe_and_confirm(db, "leaving@x.io")
 
     result = await unsubscribe(leaving.unsubscribe_token, db)

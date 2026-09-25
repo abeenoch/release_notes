@@ -1,8 +1,8 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
-
 from typing import Literal
 
 from pydantic import BaseModel, field_validator
@@ -130,9 +130,7 @@ class PublicPageResponse(BaseModel):
 
 # ── Subscribers (double opt-in, owner's own SMTP/SendGrid sends) ──────
 
-import re as _re
-
-_EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class SubscribeRequest(BaseModel):

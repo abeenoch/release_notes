@@ -1,12 +1,12 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 import re
+from contextlib import nullcontext as _nullcontext
 from pathlib import Path
 
-import base64
-from contextlib import nullcontext as _nullcontext
 from git import Repo as GitRepo
 from git.exc import GitCommandError
 

@@ -113,6 +113,15 @@ _REPO_ADDITIONS: dict[str, str] = {
     "public_enabled": "BOOLEAN NOT NULL DEFAULT 0",
 }
 
+# Indexes for the hot lookup keys (webhook resolution, public pages).
+# create_all() only builds indexes for tables it CREATES, so pre-existing
+# databases need them explicitly (Postgres: Alembic).
+_REPO_INDEX_SQL: tuple[text, ...] = (
+    text("CREATE INDEX IF NOT EXISTS ix_repositories_full_name ON repositories(full_name)"),
+    text("CREATE INDEX IF NOT EXISTS ix_repositories_github_repo_id "
+         "ON repositories(github_repo_id)"),
+)
+
 
 async def _ensure_sqlite_columns() -> None:
     """Idempotently add newly-introduced columns to existing SQLite tables."""
@@ -136,6 +145,12 @@ async def _ensure_sqlite_columns() -> None:
                         logger.info("Applied dev migration: added %s.%s", table, col)
                     except Exception as exc:  # column already exists etc.
                         logger.warning("Could not add %s.%s (%s)", table, col, exc)
+        # Lookup indexes for the webhook / public-page paths (idempotent).
+        for _stmt in _REPO_INDEX_SQL:
+            try:
+                await conn.execute(_stmt)
+            except Exception as exc:
+                logger.warning("Could not create a repo lookup index (%s)", exc)
         # Backfill the (repo_id, to_tag) idempotency constraint (SQLite has no
         # ADD CONSTRAINT). Old duplicates are deduped first, otherwise the
         # index cannot be built and idempotency would be unguarded.

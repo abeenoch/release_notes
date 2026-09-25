@@ -8,7 +8,6 @@ from jose import JWTError, jwt
 
 from app.config import settings
 
-
 # Fernet encryption for user API keys at rest ─
 
 def _get_fernet() -> Fernet:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, List
 
 from sqlalchemy import Boolean, DateTime, String, Text, func
@@ -10,10 +10,10 @@ from app.database import Base
 from app.models.mixins import uuid_column
 
 if TYPE_CHECKING:
-    from app.models.repo import Repository
     from app.models.changelog import Changelog
-    from app.models.user_config import UserLlmConfig
     from app.models.notify_config import UserNotifyConfig
+    from app.models.repo import Repository
+    from app.models.user_config import UserLlmConfig
 
 
 class User(Base):

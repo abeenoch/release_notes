@@ -39,13 +39,21 @@ export function RepoDetailPage() {
     }
   }, [repoId])
 
+  // Restart the poll timer safely: always clears the previous handle first,
+  // so repeated "Generate"/"Generate range" clicks can't leave orphaned
+  // intervals polling forever (only the last handle was stored before).
+  const startPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(load, 3000)
+  }, [load])
+
   useEffect(() => {
     load()
-    pollRef.current = setInterval(load, 3000)
+    startPolling()
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [load])
+  }, [load, startPolling])
 
   const generate = async () => {
     if (!repoId) return
@@ -53,7 +61,7 @@ export function RepoDetailPage() {
     try {
       await changelogApi.generate({ repo_id: repoId })
       await load()
-      pollRef.current = setInterval(load, 3000)
+      startPolling()
     } finally {
       setGenerating(false)
     }
@@ -77,7 +85,7 @@ export function RepoDetailPage() {
       setFromTag('')
       setToTag('')
       await load()
-      pollRef.current = setInterval(load, 3000)
+      startPolling()
     } catch (e) {
       setRangeError((e as Error).message)
     } finally {

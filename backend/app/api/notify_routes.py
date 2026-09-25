@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db, get_current_user_id
+from app.core.dependencies import get_current_user_id, get_db
 from app.core.security import encrypt_api_key
 from app.models.notify_config import UserNotifyConfig
 from app.schemas.notify import (
     NotifyConfigCreate,
-    NotifyConfigUpdate,
-    NotifyConfigResponse,
     NotifyConfigListResponse,
+    NotifyConfigResponse,
+    NotifyConfigUpdate,
 )
 
 router = APIRouter(prefix="/notify", tags=["notify"])
@@ -55,14 +55,16 @@ async def create_notify_config(
     db: AsyncSession = Depends(get_db),
 ):
     # Deactivate all other configs
-    existing = await db.execute(
-        select(UserNotifyConfig).where(
+    # Single UPDATE instead of loading and mutating every active row.
+    await db.execute(
+        update(UserNotifyConfig)
+        .where(
             UserNotifyConfig.user_id == user_id,
-            UserNotifyConfig.is_active == True,
+            UserNotifyConfig.is_active == True,  # noqa: E712
         )
+        .values(is_active=False)
+        .execution_options(synchronize_session=False)
     )
-    for cfg in existing.scalars().all():
-        cfg.is_active = False
 
     config = UserNotifyConfig(
         user_id=user_id,
@@ -139,15 +141,16 @@ async def update_notify_config(
 
     # When activating this config, deactivate all the others for this user
     if body.is_active is True and not config.is_active:
-        others = await db.execute(
-            select(UserNotifyConfig).where(
+        await db.execute(
+            update(UserNotifyConfig)
+            .where(
                 UserNotifyConfig.user_id == user_id,
                 UserNotifyConfig.id != config_id,
-                UserNotifyConfig.is_active == True,
+                UserNotifyConfig.is_active == True,  # noqa: E712
             )
+            .values(is_active=False)
+            .execution_options(synchronize_session=False)
         )
-        for other in others.scalars().all():
-            other.is_active = False
 
     if body.provider is not None:
         config.provider = body.provider

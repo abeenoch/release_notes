@@ -3,22 +3,21 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi import HTTPException, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.config import settings
-from app.database import init_db
-from app.api.health import router as health_router
 from app.api.auth import router as auth_router
-from app.api.repos import router as repos_router
 from app.api.changelogs import router as changelogs_router
-from app.api.webhooks import router as webhooks_router
+from app.api.health import router as health_router
 from app.api.notify_routes import router as notify_router
 from app.api.public_pages import router as public_router
+from app.api.repos import router as repos_router
+from app.api.webhooks import router as webhooks_router
+from app.config import settings
+from app.database import init_db
 
 
 @asynccontextmanager
@@ -27,7 +26,9 @@ async def lifespan(app: FastAPI):
     await init_db()
     try:
         from datetime import datetime, timedelta, timezone
+
         from sqlalchemy import update
+
         from app.database import async_session_factory
         from app.models.changelog import Changelog as _Changelog
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)

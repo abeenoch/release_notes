@@ -10,8 +10,8 @@ from app.database import Base
 from app.models.mixins import uuid_column
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.repo import Repository
+    from app.models.user import User
 
 
 class Changelog(Base):

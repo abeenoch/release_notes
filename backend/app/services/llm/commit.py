@@ -59,9 +59,12 @@ def _guess_version(from_tag: str, entries: list[dict]) -> str:
     if ver_match:
         major, minor, patch = map(int, ver_match.groups())
         if has_breaking:
-            major += 1; minor = 0; patch = 0
+            major += 1
+            minor = 0
+            patch = 0
         elif has_feature:
-            minor += 1; patch = 0
+            minor += 1
+            patch = 0
         else:
             patch += 1
         return f"v{major}.{minor}.{patch}"
@@ -137,8 +140,8 @@ class CommitProvider(LlmProviderInterface):
 
         # Parse commit lines
         commit_lines = [
-            l.strip() for l in commit_section.split("\n")
-            if l.strip() and l.strip().startswith("[")
+            line.strip() for line in commit_section.split("\n")
+            if line.strip() and line.strip().startswith("[")
         ]
 
         if not commit_lines or commit_lines == ["(no commits found between these refs)"]:

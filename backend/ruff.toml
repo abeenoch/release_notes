@@ -1,0 +1,14 @@
+# Backend lint config — deliberately conservative:
+#   E/F/W : pycodestyle + pyflakes (real bugs: unused imports, undefined names)
+#   B     : bugbear (mutable defaults, silent excepts, etc.)
+#   I     : import order
+# Ignored:
+#   B008  — FastAPI's idiom is Depends()/Query()/Body() in argument defaults;
+#           flagging that produces ~30 false positives.
+#   E501  — long lines are a review/style matter, not a correctness one.
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "B", "I"]
+ignore = ["B008", "E501"]

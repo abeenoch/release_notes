@@ -14,12 +14,12 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.security import decrypt_api_key
 from app.models.changelog import Changelog as ChangelogModel
 from app.models.repo import Repository
 from app.models.user import User
 from app.services.github import GitHubClient, ReleaseAlreadyExistsError
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 

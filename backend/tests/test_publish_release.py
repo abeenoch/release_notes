@@ -9,19 +9,20 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.database import Base
-from app.models.changelog import Changelog
-from app.models.repo import Repository
-from app.models.user import User
+import app.models.notify_config  # noqa: F401
 
 # Import sibling model modules so SQLAlchemy can resolve User's relationships
 # (User.llm_configs / User.notify_configs) when configuring mappers.
 import app.models.user_config  # noqa: F401
-import app.models.notify_config  # noqa: F401
-
+from app.database import Base
+from app.models.changelog import Changelog
+from app.models.repo import Repository
+from app.models.user import User
 from app.services import publish_service
 from app.services.github import (
-    GitHubApiError, ReleaseAlreadyExistsError, _github_error_detail,
+    GitHubApiError,
+    ReleaseAlreadyExistsError,
+    _github_error_detail,
     _is_already_exists,
 )
 
@@ -294,10 +295,12 @@ def test_error_detail_prefers_githubs_own_explanation():
 
 
 def test_release_tag_shortens_full_sha():
-    from app.services import publish_service as ps
     from types import SimpleNamespace
 
-    mk = lambda tag, **kw: SimpleNamespace(to_tag=tag, version=kw.get("version"))
+    from app.services import publish_service as ps
+
+    def mk(tag, **kw):
+        return SimpleNamespace(to_tag=tag, version=kw.get("version"))
     assert ps._release_tag(mk("23cf4904f513493d05d06f4c2977bc698bddd230")) == "23cf490"
     assert ps._release_tag(mk("4a87346")) == "4a87346"
     assert ps._release_tag(mk("v1.2.3")) == "v1.2.3"

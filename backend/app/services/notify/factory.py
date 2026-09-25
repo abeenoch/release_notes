@@ -4,9 +4,9 @@ Notification provider factory.
 from __future__ import annotations
 
 from app.services.notify.base import NotifyProviderInterface
-from app.services.notify.smtp import SmtpProvider
 from app.services.notify.sendgrid import SendGridProvider
 from app.services.notify.slack import SlackProvider
+from app.services.notify.smtp import SmtpProvider
 
 
 def create_notify_provider(

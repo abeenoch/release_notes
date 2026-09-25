@@ -1,9 +1,11 @@
 """Regression tests for the bug-fix batch: provider enums, pagination,
 webhook race guard, prompt truncation and commit counting."""
+from unittest.mock import MagicMock
+
 import pytest
 import pytest_asyncio
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from unittest.mock import MagicMock
 
 from app.api.webhooks import _queue_changelog_for_tag
 from app.database import Base
@@ -12,7 +14,6 @@ from app.models.repo import Repository
 from app.models.user import User
 from app.schemas.changelog import LlmConfigCreate
 from app.schemas.notify import NotifyConfigCreate
-from pydantic import ValidationError
 
 
 @pytest_asyncio.fixture

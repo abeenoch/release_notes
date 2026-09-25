@@ -1,7 +1,7 @@
 """
 Cross-database UUID column helper.
 
-- SQLite: uses String(36) 
+- SQLite: uses String(36)
 - PostgreSQL: uses native UUID type
 """
 from __future__ import annotations

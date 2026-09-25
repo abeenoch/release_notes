@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.dependencies import get_db
+from app.models.changelog import Changelog as ChangelogModel
 from app.models.repo import Repository
 from app.models.user import User
-from app.models.changelog import Changelog as ChangelogModel
 from app.tasks.worker import run_changelog_generation
 
 logger = logging.getLogger(__name__)
@@ -176,6 +176,7 @@ async def _queue_changelog_for_tag(
     full_name: str,
     tag_name: str,
     github_repo_id: int | None = None,
+    resolved: list[Repository] | None = None,
 ) -> dict:
     """Queue a changelog generation for *every* active registration.
 
@@ -189,7 +190,11 @@ async def _queue_changelog_for_tag(
     duplicate rules run independently, and the (repo_id, to_tag) UNIQUE
     constraint is the final guard per repo.
     """
-    repos = await _find_active_repos(db, full_name, github_repo_id)
+    # Callers that already resolved the repos (the push path) pass them in,
+    # so a push doesn't run the same lookup twice.
+    repos = resolved if resolved is not None else await _find_active_repos(
+        db, full_name, github_repo_id
+    )
     if not repos:
         return {"status": "ignored", "message": f"Repository {full_name} not registered or inactive"}
 
@@ -235,7 +240,9 @@ async def _handle_push(
 
     if head_sha in ("0000000000000000000000000000000000000000", ""):
         head_sha = "HEAD"
-    return await _queue_changelog_for_tag(db, background_tasks, full_name, head_sha, github_repo_id)
+    return await _queue_changelog_for_tag(
+        db, background_tasks, full_name, head_sha, github_repo_id, resolved=repos
+    )
 
 
 @router.post("")
@@ -271,8 +278,10 @@ async def receive_webhook(
     # Parse payload
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON"
+        ) from exc
 
     full_name: str | None = None
     github_repo_id: int | None = None

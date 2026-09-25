@@ -5,8 +5,9 @@ Ported from TypeScript src/notify/slack.ts
 """
 from __future__ import annotations
 
-import httpx
 import re
+
+import httpx
 
 from app.services.notify.base import NotifyProviderInterface
 
@@ -38,7 +39,7 @@ class SlackProvider(NotifyProviderInterface):
             if not trimmed or trimmed.startswith("---"):
                 continue
 
-            lines = [l for l in trimmed.split("\n") if l.strip()]
+            lines = [line for line in trimmed.split("\n") if line.strip()]
 
             # Heading
             if lines:
@@ -50,7 +51,7 @@ class SlackProvider(NotifyProviderInterface):
                     })
 
             # Bullet items
-            bullets = [re.sub(r"^- ", "", l) for l in lines if l.startswith("- ")]
+            bullets = [re.sub(r"^- ", "", line) for line in lines if line.startswith("- ")]
             if bullets:
                 for i in range(0, len(bullets), 10):
                     chunk = bullets[i:i + 10]

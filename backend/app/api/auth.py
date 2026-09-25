@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db, get_current_user_id
+from app.core.dependencies import get_current_user_id, get_db
 from app.models.user import User
 from app.schemas.user import GitHubAuthRequest, TokenResponse, UserResponse
 from app.services.auth import AuthService
@@ -19,10 +19,12 @@ async def login_with_github(
     """Exchange a GitHub OAuth code for a JWT token."""
     try:
         auth_service = AuthService()
-        user, token = await auth_service.login_with_github(body.code, db)
+        _user, token = await auth_service.login_with_github(body.code, db)
         return TokenResponse(access_token=token)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)
+        ) from e
 
 
 @router.get("/me", response_model=UserResponse)

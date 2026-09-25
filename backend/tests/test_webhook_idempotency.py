@@ -37,7 +37,7 @@ async def _seed(db: AsyncSession) -> Repository:
 
 @pytest.mark.asyncio
 async def test_pending_changelog_not_duplicated(db):
-    repo = await _seed(db)
+    await _seed(db)
     bg = MagicMock()
     first = await _queue_changelog_for_tag(db, bg, "octocat/hello", "v1.0.0")
     assert first["status"] == "queued"

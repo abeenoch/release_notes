@@ -1,22 +1,27 @@
 from __future__ import annotations
 
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.dependencies import get_db, get_current_user_id
+from app.config import settings
+from app.core.dependencies import get_current_user_id, get_db
 from app.core.security import decrypt_api_key
-from app.models.user import User
 from app.models.repo import Repository
+from app.models.user import User
 from app.schemas.repo import (
-    RepoCreate, RepoResponse, RepoListResponse,
-    RepoToggleActive, GitHubRepoPreview, GitHubRepoListResponse,
-    RepoImportRequest, RepoPublicUpdate,
+    GitHubRepoListResponse,
+    GitHubRepoPreview,
+    RepoImportRequest,
+    RepoListResponse,
+    RepoPublicUpdate,
+    RepoResponse,
+    RepoToggleActive,
 )
 from app.services.github import GitHubClient
-from app.config import settings
 
-import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/repos", tags=["repos"])
@@ -107,16 +112,19 @@ async def sync_github_repos(
     )
     gh_repos = await gh.get_user_repos(gh_token)
 
+    # One query for the user's existing rows — this loop runs over every repo
+    # the GitHub account can see, so a SELECT per repo was an N+1.
+    existing_rows = await db.execute(
+        select(Repository).where(Repository.user_id == user_id)
+    )
+    by_name: dict[str, Repository] = {
+        r.full_name: r for r in existing_rows.scalars().all()
+    }
+
     synced = []
     for gh_repo in gh_repos:
         full_name = gh_repo["full_name"]
-        existing = await db.execute(
-            select(Repository).where(
-                Repository.user_id == user_id,
-                Repository.full_name == full_name,
-            )
-        )
-        repo = existing.scalar_one_or_none()
+        repo = by_name.get(full_name)
         if repo:
             repo.clone_url = gh_repo.get("clone_url", repo.clone_url)
             repo.default_branch = gh_repo.get("default_branch", repo.default_branch)
@@ -133,6 +141,7 @@ async def sync_github_repos(
                 is_active=False,
             )
             db.add(repo)
+            by_name[full_name] = repo
         synced.append(repo)
 
     await db.flush()
@@ -176,16 +185,21 @@ async def import_selected_repos(
         client_secret=settings.github_client_secret or "",
     )
 
+    # Batch the existence check: one query for every requested name instead
+    # of a SELECT per name.
+    existing_rows = await db.execute(
+        select(Repository).where(
+            Repository.user_id == user_id,
+            Repository.full_name.in_(body.full_names),
+        )
+    )
+    by_name: dict[str, Repository] = {
+        r.full_name: r for r in existing_rows.scalars().all()
+    }
+
     imported: list[Repository] = []
     for full_name in body.full_names:
-        # Check if already exists
-        existing = await db.execute(
-            select(Repository).where(
-                Repository.user_id == user_id,
-                Repository.full_name == full_name,
-            )
-        )
-        repo = existing.scalar_one_or_none()
+        repo = by_name.get(full_name)
         if repo:
             repo.is_active = True
             imported.append(repo)
@@ -207,6 +221,7 @@ async def import_selected_repos(
             is_active=True,
         )
         db.add(repo)
+        by_name[full_name] = repo
         imported.append(repo)
 
         # Create webhook on GitHub (best-effort)
@@ -246,7 +261,7 @@ async def toggle_repo_active(
     db: AsyncSession = Depends(get_db),
 ):
     """Toggle or set a repository's active state.
-    
+
     If body.is_active is provided, set it to that value.
     Otherwise, toggle the current state.
     """
@@ -259,12 +274,12 @@ async def toggle_repo_active(
     repo = result.scalar_one_or_none()
     if not repo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
-    
+
     if body is not None and body.is_active is not None:
         repo.is_active = body.is_active
     else:
         repo.is_active = not repo.is_active
-    
+
     await db.flush()
     await db.commit()
     # Best-effort: keep the GitHub webhook in sync with the active flag.

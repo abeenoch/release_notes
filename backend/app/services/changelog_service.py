@@ -1,21 +1,20 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.security import decrypt_api_key
+from app.models.changelog import Changelog as ChangelogModel
 from app.models.repo import Repository
 from app.models.user import User
 from app.models.user_config import UserLlmConfig
-from app.models.changelog import Changelog as ChangelogModel
 from app.services.git_ops import GitClient
 from app.services.llm.base import changelog_system_prompt, changelog_user_prompt
 from app.services.llm.factory import create_llm_provider
-from app.config import settings
-
-import re
 
 
 def _fix_changelog_heading(markdown: str, version: str) -> str:

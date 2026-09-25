@@ -1,26 +1,31 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+import logging
 
-from app.core.dependencies import get_db, get_current_user_id
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import get_current_user_id, get_db
 from app.core.security import encrypt_api_key
-from app.models.user import User
-from app.models.repo import Repository
-from app.models.user_config import UserLlmConfig
 from app.models.changelog import Changelog as ChangelogModel
+from app.models.repo import Repository
+from app.models.user import User
+from app.models.user_config import UserLlmConfig
 from app.schemas.changelog import (
-    LlmConfigCreate, LlmConfigResponse, LlmConfigUpdate,
-    ChangelogTriggerRequest, ChangelogResponse, ChangelogListResponse,
+    ChangelogListResponse,
+    ChangelogResponse,
     ChangelogStatsResponse,
+    ChangelogTriggerRequest,
+    LlmConfigCreate,
+    LlmConfigResponse,
+    LlmConfigUpdate,
 )
-from app.services.changelog_service import ChangelogService, repo_work_dir
-from app.services.git_ops import ref_exists, validate_ref_shape
 from app.services import publish_service
+from app.services.changelog_service import repo_work_dir
+from app.services.git_ops import ref_exists, validate_ref_shape
 from app.services.github import GitHubApiError
 from app.tasks.worker import run_changelog_generation
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -66,15 +71,17 @@ async def create_llm_config(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="API key is required for this provider",
         )
-    # Deactivate all other configs, then create a new active one
-    existing = await db.execute(
-        select(UserLlmConfig).where(
+    # Deactivate all other configs in ONE statement (synchronize_session=False:
+    # the rows aren't read back, and the new config is added right after).
+    await db.execute(
+        update(UserLlmConfig)
+        .where(
             UserLlmConfig.user_id == user_id,
-            UserLlmConfig.is_active == True,
+            UserLlmConfig.is_active == True,  # noqa: E712
         )
+        .values(is_active=False)
+        .execution_options(synchronize_session=False)
     )
-    for cfg in existing.scalars().all():
-        cfg.is_active = False
     config = UserLlmConfig(
         user_id=user_id, provider=body.provider,
         api_key_encrypted=encrypt_api_key(body.api_key),
@@ -109,15 +116,16 @@ async def update_llm_config(
 
     # When activating this config, deactivate all the others for this user
     if body.is_active is True and not config.is_active:
-        others = await db.execute(
-            select(UserLlmConfig).where(
+        await db.execute(
+            update(UserLlmConfig)
+            .where(
                 UserLlmConfig.user_id == user_id,
                 UserLlmConfig.id != config_id,
-                UserLlmConfig.is_active == True,
+                UserLlmConfig.is_active == True,  # noqa: E712
             )
+            .values(is_active=False)
+            .execution_options(synchronize_session=False)
         )
-        for other in others.scalars().all():
-            other.is_active = False
 
     if body.api_key is not None:
         if body.api_key == "":
@@ -204,7 +212,9 @@ async def publish_github_release(
         return await publish_service.publish_release(changelog, repo, db)
     except ValueError as exc:
         # Bad input on our side (e.g. no tag to release) → 400.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     except GitHubApiError as exc:
         # GitHub said no — surface its status honestly instead of a blanket 502.
         logger.warning(
@@ -217,13 +227,14 @@ async def publish_github_release(
             else status.HTTP_429_TOO_MANY_REQUESTS if exc.status_code == 429
             else status.HTTP_502_BAD_GATEWAY
         )
-        raise HTTPException(status_code=http_status, detail=exc.detail)
+        raise HTTPException(status_code=http_status, detail=exc.detail) from exc
     except Exception:
         logger.exception("Release publish failed for changelog %s", changelog_id)
+        # from None: the log has the detail; the client gets a clean message.
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Publishing to GitHub failed — please try again",
-        )
+        ) from None
 
 
 # ── Changelog Generation ──
@@ -359,23 +370,21 @@ async def changelog_stats(
     base = [ChangelogModel.user_id == user_id]
     if repo_id:
         base.append(ChangelogModel.repo_id == repo_id)
-    total = (await db.execute(
-        select(func.count()).select_from(ChangelogModel).where(*base)
-    )).scalar_one()
-    completed = (await db.execute(
-        select(func.count()).select_from(ChangelogModel).where(*base, ChangelogModel.status == "completed")
-    )).scalar_one()
-    failed = (await db.execute(
-        select(func.count()).select_from(ChangelogModel).where(*base, ChangelogModel.status == "failed")
-    )).scalar_one()
-    published = (await db.execute(
-        select(func.count()).select_from(ChangelogModel).where(*base, ChangelogModel.release_url.is_not(None))
-    )).scalar_one()
+    # One aggregate scan instead of four COUNT round-trips (count().filter()
+    # maps to SQL FILTER, supported by SQLite 3.30+ and PostgreSQL).
+    row = (await db.execute(
+        select(
+            func.count().label("total"),
+            func.count().filter(ChangelogModel.status == "completed").label("completed"),
+            func.count().filter(ChangelogModel.status == "failed").label("failed"),
+            func.count().filter(ChangelogModel.release_url.is_not(None)).label("published"),
+        ).select_from(ChangelogModel).where(*base)
+    )).one()
     return ChangelogStatsResponse(
-        changelogs_total=total,
-        changelogs_completed=completed,
-        changelogs_failed=failed,
-        changelogs_published=published,
+        changelogs_total=row.total,
+        changelogs_completed=row.completed,
+        changelogs_failed=row.failed,
+        changelogs_published=row.published,
     )
 
 

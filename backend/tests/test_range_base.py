@@ -11,7 +11,6 @@ from app.services.changelog_service import resolve_range_base
 from app.services.git_ops import GitClient
 
 
-
 def _make_repo(path, commits=5):
     repo = GitRepo.init(path)
     actor = Actor("Tester", "tester@example.com")

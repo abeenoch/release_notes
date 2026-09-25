@@ -3,13 +3,13 @@ LLM provider factory — creates the right provider based on config.
 """
 from __future__ import annotations
 
-from app.services.llm.base import LlmProviderInterface
-from app.services.llm.openai import OpenAiProvider
 from app.services.llm.anthropic import AnthropicProvider
-from app.services.llm.ollama import OllamaProvider
-from app.services.llm.groq import GroqProvider
-from app.services.llm.openrouter import OpenRouterProvider
+from app.services.llm.base import LlmProviderInterface
 from app.services.llm.commit import CommitProvider
+from app.services.llm.groq import GroqProvider
+from app.services.llm.ollama import OllamaProvider
+from app.services.llm.openai import OpenAiProvider
+from app.services.llm.openrouter import OpenRouterProvider
 
 
 def create_llm_provider(

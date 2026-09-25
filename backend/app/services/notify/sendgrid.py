@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Content
+from sendgrid.helpers.mail import Content, Mail
 
 from app.services.notify.base import NotifyProviderInterface
 

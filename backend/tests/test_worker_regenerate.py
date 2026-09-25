@@ -12,6 +12,10 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import app.models.notify_config  # noqa: F401
+
+# Resolve User's relationships for mapper configuration.
+import app.models.user_config  # noqa: F401
 from app.database import Base
 from app.models.changelog import Changelog
 from app.models.repo import Repository
@@ -22,10 +26,6 @@ from app.tasks.worker import (
     _apply_result,
     should_notify,
 )
-
-# Resolve User's relationships for mapper configuration.
-import app.models.user_config  # noqa: F401
-import app.models.notify_config  # noqa: F401
 
 
 @pytest_asyncio.fixture
