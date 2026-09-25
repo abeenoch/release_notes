@@ -13,11 +13,9 @@ frontend/node_modules/
 .env.local
 .env.*
 
-# Data files
-backend/data/*.db
-backend/data/*.db.*      # deploy-time DB backups (may contain user data)
-backend/data/*.bak
-backend/data/repos/
+# Data files — the whole backend/data/ tree (live DB, deploy backups, cloned
+# repos) stays off GitHub; the app creates the directory at startup.
+backend/data/
 
 # IDE
 .vscode/

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -9,6 +10,26 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+def ensure_sqlite_dir(database_url: str) -> Path | None:
+    """Create the parent directory for a SQLite file URL before connecting.
+
+    backend/data/ is intentionally NOT tracked in git (it holds the live DB
+    and cloned repos), so fresh clones arrive without it — SQLite would fail
+    with 'unable to open database file'. Idempotent. Returns the directory
+    it ensured, or None for in-memory URLs.
+    """
+    if "///" not in database_url:
+        return None
+    raw = database_url.split("///", 1)[1].split("?")[0]
+    if not raw or raw == ":memory:":
+        return None
+    directory = Path(raw).expanduser().resolve().parent
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+ensure_sqlite_dir(settings.database_url)
 
 engine = create_async_engine(
     settings.database_url,
