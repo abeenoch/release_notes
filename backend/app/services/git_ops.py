@@ -171,6 +171,21 @@ class GitClient:
             )
         return from_tag or previous, to_tag or latest
 
+    def has_tag(self, name: str) -> bool:
+        """True when `name` is an actual tag in this clone.
+
+        Used to tell a release target (a real tag → range = "since the
+        previous release") from a push target (a bare commit SHA → range
+        should start at the last generated changelog).
+        """
+        if not name:
+            return False
+        try:
+            self.repo.tags[name]
+            return True
+        except (IndexError, KeyError, ValueError):
+            return False
+
     def is_ancestor(self, ancestor_ref: str, descendant_ref: str = "HEAD") -> bool:
         """
         Return True if ancestor_ref is an ancestor of descendant_ref.

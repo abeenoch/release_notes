@@ -44,6 +44,40 @@ def repo_work_dir(user_id: str, repo: Repository) -> Path:
     return base_dir / user_id / repo.full_name.replace("/", "_")
 
 
+def resolve_range_base(
+    git: GitClient,
+    from_ref: str | None,
+    to_ref: str | None,
+    last_generated_commit: str | None,
+) -> tuple[str | None, bool]:
+    """Choose the base ref for a non-release range, and whether it's incremental.
+
+    Tag-derived bases are correct for releases ("changes since the previous
+    release") but wrong for plain pushes: a push creates no tag, so the base
+    never moves and every new changelog re-covers everything since the last
+    tag — yesterday's work reappearing in today's changelog, with the commit
+    count creeping up by one each time.
+
+    When the last generated commit sits strictly between the tag-derived base
+    and the target, it is the honest boundary: prefer it. Returns the base
+    unchanged when it doesn't (stale/rewritten history, or a genuinely newer
+    tag), so nothing regresses.
+    """
+    if not from_ref or not to_ref or not last_generated_commit:
+        return from_ref, False
+    if not git.is_ancestor(from_ref, last_generated_commit):
+        return from_ref, False
+    if not git.is_ancestor(last_generated_commit, to_ref):
+        return from_ref, False
+    if git.is_ancestor(to_ref, last_generated_commit):
+        # Tracking already sits exactly at the target (nothing new, e.g. a
+        # regenerate on an unchanged repo). Switching bases here would emit
+        # an empty "no commits" changelog that then absorbs the previous,
+        # meaningful row for the same tag — keep the tag base instead.
+        return from_ref, False
+    return last_generated_commit, True
+
+
 class ChangelogService:
     """Orchestrate changelog generation from git tags through LLM."""
 
@@ -92,6 +126,15 @@ class ChangelogService:
             from_ref, to_ref = from_tag, to_tag
         else:
             from_ref, to_ref = git.resolve_tags(from_tag, to_tag)
+            # Pushes don't create tags, so a tag-derived base would never
+            # advance and every changelog would re-cover everything since the
+            # last tag. Prefer the last generated commit when it's newer
+            # (skip this for real tag targets — releases keep "since the
+            # previous release" semantics).
+            if from_ref and not git.has_tag(to_ref or ""):
+                from_ref, incremental = resolve_range_base(
+                    git, from_ref, to_ref, repo.last_generated_commit
+                )
             if not from_ref:
                 # Tagless repo — try incremental from the last generated commit
                 if repo.last_generated_commit:
