@@ -133,7 +133,7 @@ export function ChangelogDetailPage() {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{version}</h1>
-            <StatusBadge status={changelog.status} notificationStatus={changelog.notification_status} />
+            <StatusBadge status={changelog.status} />
           </div>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
             {changelog.from_tag ? `${changelog.from_tag} → ` : ''}

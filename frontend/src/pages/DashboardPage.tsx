@@ -114,7 +114,7 @@ export function DashboardPage() {
                     <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {c.version || c.to_tag || 'Unversioned'}
                     </p>
-                    <StatusBadge status={c.status} notificationStatus={c.notification_status} />
+                    <StatusBadge status={c.status} />
                   </div>
                   <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">{c.summary || ''}</p>
                 </div>
