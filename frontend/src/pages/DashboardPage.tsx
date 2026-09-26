@@ -29,7 +29,10 @@ export function DashboardPage() {
       ])
       setRepos(r?.repos ?? [])
       setChangelogs(c?.changelogs ?? [])
-      setHasLlm((l ?? []).some((x) => x.is_active))
+      // "LLM Connected" must mean an actual LLM. provider 'commit' is the
+      // "Commit Parser (no LLM)" manual mode — it creates an active config
+      // row too, and used to make this stat say Yes with no LLM configured.
+      setHasLlm((l ?? []).some((x) => x.is_active && x.provider !== 'commit'))
       if (s) {
         setTotalChangelogs(s.changelogs_total)
         setPublishedCount(s.changelogs_published)
