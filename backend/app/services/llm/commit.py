@@ -43,12 +43,15 @@ def _categorize_commit(message: str) -> dict | None:
     if match:
         prefix, desc = match.group(1), match.group(2)
         description = desc or trimmed
+        # Clean any escaped newlines and keep only the subject
+        description = description.replace("\\r\\n", "\n").replace("\\n", "\n").split("\n")[0].strip()
         entry_type = TYPE_MAP.get(prefix.lower(), "other")
         if is_breaking:
             description = f"[BREAKING] {description}"
         return {"type": entry_type, "description": description, "is_breaking": is_breaking}
 
-    return {"type": "other", "description": trimmed, "is_breaking": False}
+    fallback_desc = trimmed.replace("\\r\\n", "\n").replace("\\n", "\n").split("\n")[0].strip()
+    return {"type": "other", "description": fallback_desc, "is_breaking": False}
 
 
 def _guess_version(from_tag: str, entries: list[dict]) -> str:

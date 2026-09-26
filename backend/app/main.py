@@ -102,10 +102,11 @@ if _frontend_dist.exists():
     async def serve_landing():
         """Serve the cinematic landing page at root."""
         landing = _frontend_dist / "landing.html"
+        headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
         if landing.exists():
-            return FileResponse(str(landing))
+            return FileResponse(str(landing), headers=headers)
         # Fallback to React app if no landing page
-        return FileResponse(str(_frontend_dist / "index.html"))
+        return FileResponse(str(_frontend_dist / "index.html"), headers=headers)
 
     # ── Favicon ───────────────────────────────────────────
     # Serve the brand favicon explicitly so it isn't swallowed by the
@@ -141,8 +142,11 @@ if _frontend_dist.exists():
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """SPA fallback: serve index.html for all non-API, non-landing routes."""
-        # Serve the React app for all client-side routes
-        return FileResponse(str(_frontend_dist / "index.html"))
+        # Never cache index.html so browser always gets fresh asset hashes
+        return FileResponse(
+            str(_frontend_dist / "index.html"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
 
     print(f"✨ Serving landing + frontend from {_frontend_dist}")
 else:

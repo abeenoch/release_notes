@@ -229,7 +229,8 @@ class GitClient:
         lines: list[str] = []
         for commit in commits:
             date = commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S")
-            msg = commit.message.split("\n")[0].strip()
+            raw_msg = commit.message.replace("\\r\\n", "\n").replace("\\n", "\n")
+            msg = raw_msg.split("\n")[0].strip()
             lines.append(f"[{commit.hexsha[:7]}] {date} — {msg}")
         if total > max_commits:
             lines.append(f"... and {total - max_commits} older commits omitted")
