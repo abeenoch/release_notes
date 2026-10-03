@@ -47,6 +47,25 @@ def test_widget_js_is_served(client):
     assert "data-repo" in resp.text
 
 
+def test_widget_links_survive_host_page_interference(client):
+    """Regression: links in a shadow DOM can be swallowed by a host page.
+
+    SPA routers / themes / analytics attach document-level click handlers that
+    preventDefault every <a>; the widget's "View all & subscribe" link lives in
+    a shadow DOM so such a handler made it do nothing. Also, an inherited
+    `pointer-events:none` made the link visible-but-unclickable. The widget must
+    stop the click from reaching the page, re-navigate if it was already
+    cancelled, re-enable pointer events on its card, and mount into <body> when
+    the snippet is pasted into <head>.
+    """
+    text = client.get("/widget.js").text
+    assert "stopPropagation" in text
+    assert "defaultPrevented" in text
+    assert "pointer-events:auto" in text
+    assert "document.head" in text  # <head>-paste fallback
+    assert "rel = 'noopener noreferrer'" in text or 'rel = "noopener noreferrer"' in text
+
+
 def test_widget_js_not_the_spa_fallback(client):
     """/widget.js must never return index.html (the catch-all would)."""
     resp = client.get("/widget.js")

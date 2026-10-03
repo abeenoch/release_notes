@@ -26,12 +26,15 @@
 
   var host = document.createElement('div');
   host.setAttribute('data-rn-widget', '');
-  if (script.parentNode) script.parentNode.insertBefore(host, script.nextSibling);
+  mountNear(host, script);
 
   var shadow = host.attachShadow({ mode: 'open' });
   var style = [
     '.card{font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;',
-    'border:1px solid #e4e4e7;border-radius:12px;background:#fff;overflow:hidden;}',
+    'border:1px solid #e4e4e7;border-radius:12px;background:#fff;overflow:hidden;',
+    // pointer-events is inherited: re-enable hit-testing on our card so a host
+    // page's `pointer-events:none` ancestor can't make the widget visible-but-dead.
+    'pointer-events:auto;}',
     '.head{display:flex;align-items:center;justify-content:space-between;gap:8px;',
     'padding:12px 16px;border-bottom:1px solid #e4e4e7;background:#fafafa;}',
     '.head a{font-weight:600;color:#18181b;text-decoration:none;}',
@@ -55,13 +58,44 @@
     return n;
   }
 
+  // If the snippet is pasted into <head> (very common), inserting beside the
+  // script would drop the widget into a display:none subtree. Fall back to body.
+  function mountNear(node, ref) {
+    var parent = ref.parentNode;
+    if (!parent || parent === document.head || parent.tagName === 'HTML') {
+      parent = document.body || parent;
+    }
+    if (!parent) return;
+    if (parent === ref.parentNode) parent.insertBefore(node, ref.nextSibling);
+    else parent.appendChild(node);
+  }
+
+  // Host pages (SPA routers, themes, analytics) often attach document-level
+  // click handlers that preventDefault every <a>. Our links live in a shadow
+  // DOM, so such a handler can swallow the click and the "View all & subscribe"
+  // link silently does nothing. Stop the event before it reaches the page; if a
+  // capture-phase handler already cancelled it, navigate ourselves so the link
+  // still works.
+  function makeLink(url, text) {
+    var a = el('a', null, text);
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (e.defaultPrevented) {
+        e.preventDefault();
+        window.open(url, '_blank', 'noopener');
+      }
+    });
+    return a;
+  }
+
   function render(data) {
     var card = el('div', 'card');
     var head = el('div', 'head');
-    var title = el('a', null, data.full_name);
-    title.href = origin + '/' + data.full_name;
-    title.target = '_blank';
-    head.appendChild(title);
+    var pageUrl = origin + '/' + data.full_name;
+    head.appendChild(makeLink(pageUrl, data.full_name));
     head.appendChild(el('span', 'badge', data.changelogs.length + ' release' +
       (data.changelogs.length === 1 ? '' : 's')));
     card.appendChild(head);
@@ -82,10 +116,7 @@
     }
 
     var foot = el('div', 'foot');
-    var more = el('a', null, 'View all & subscribe →');
-    more.href = origin + '/' + data.full_name;
-    more.target = '_blank';
-    foot.appendChild(more);
+    foot.appendChild(makeLink(pageUrl, 'View all & subscribe →'));
     card.appendChild(foot);
 
     shadow.innerHTML = '<style>' + style + '</style>';
