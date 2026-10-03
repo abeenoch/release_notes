@@ -169,6 +169,39 @@ async def test_subscribe_without_owner_email_config_400s(db, outbox):
     assert (await db.execute(select(Subscriber))).scalars().all() == []
 
 
+class _FailingProvider:
+    """A provider whose send always blows up — SMTP/SendGrid is down."""
+
+    async def send(self, *args, **kwargs):
+        raise RuntimeError("mail transport down")
+
+
+@pytest.mark.asyncio
+async def test_subscribe_lookup_is_case_insensitive(db, outbox):
+    """A `Owner/Repo`-cased subscribe still resolves the stored owner/repo."""
+    await _seed(db)
+    resp = await subscribe("OctoCat", "HELLO", SubscribeRequest(email="a@b.co"), db)
+    assert resp.status == "pending_confirmation"
+    assert len(outbox.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_subscribe_reports_when_confirmation_mail_fails(db, monkeypatch):
+    """No silent fake success: if the confirmation mail can't be sent, the
+    visitor gets a retry-able 502 instead of a false 'check your inbox'."""
+    await _seed(db)
+    monkeypatch.setattr(
+        "app.services.notification_service.create_notify_provider",
+        lambda **kwargs: _FailingProvider(),
+    )
+    with pytest.raises(HTTPException) as exc:
+        await subscribe("octocat", "hello", SubscribeRequest(email="a@b.co"), db)
+    assert exc.value.status_code == 502
+    assert "try again" in exc.value.detail.lower()
+    # The pending row is kept so a retry reuses it (idempotent resubscribe).
+    assert len((await db.execute(select(Subscriber))).scalars().all()) == 1
+
+
 @pytest.mark.asyncio
 async def test_confirm_unknown_token(db):
     resp = await confirm_subscription("nope-nope", db)

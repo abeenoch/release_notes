@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
@@ -30,10 +30,12 @@ async def _resolve_public_repo(db: AsyncSession, owner: str, repo: str) -> Repos
     """The opted-in registration for /owner/repo, or 404 (never 403 — the
     endpoint must not confirm existence of unpublished pages)."""
     full_name = f"{owner}/{repo}"
+    # GitHub repo names are case-insensitive: match the same way so a snippet
+    # typed as `Owner/Repo` still resolves to the stored `owner/repo`.
     result = await db.execute(
         select(Repository)
         .where(
-            Repository.full_name == full_name,
+            func.lower(Repository.full_name) == full_name.lower(),
             Repository.public_enabled == True,  # noqa: E712
         )
         .order_by(Repository.is_active.desc(), Repository.updated_at.desc())
@@ -149,11 +151,17 @@ async def subscribe(
     try:
         await svc.send_confirmation(cfg, sub, registration.full_name)
     except Exception:
-        # Don't leak send failures to the public form; the row stays pending
-        # and a retry (resubscribe) issues a fresh link.
+        # Be honest rather than falsely say "check your inbox": the row is
+        # already saved (a retry reuses it and issues a fresh link), but if the
+        # link can't actually be mailed this visitor must be told to retry.
         logger.exception(
             "Confirmation mail failed for %s (%s)", body.email, registration.full_name
         )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="We couldn't send the confirmation email right now. "
+                   "Please try again in a moment.",
+        ) from None
 
     return SubscribeResponse(
         status="pending_confirmation",

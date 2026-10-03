@@ -187,6 +187,16 @@ async def test_opt_in_serves_page(db):
     assert page.full_name == "octocat/hello"
 
 
+@pytest.mark.asyncio
+async def test_lookup_is_case_insensitive(db):
+    """GitHub repo names are case-insensitive: /Owner/Repo must resolve the
+    stored owner/repo (a widget snippet typed with different casing still works)."""
+    await _seed(db, "alice", public=True)
+    page = await get_public_page("OctoCat", "HELLO", db)
+    assert page.full_name == "octocat/hello"
+    assert [c.version for c in page.changelogs] == ["v1.0.0"]
+
+
 # ── what leaves the server ───────────────────────────────────────────
 
 
