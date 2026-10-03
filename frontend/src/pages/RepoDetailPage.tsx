@@ -141,31 +141,33 @@ export function RepoDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
         <button
           onClick={() => navigate('/repos')}
-          className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
         >
           <ArrowLeft size={18} />
         </button>
-        <div className="min-w-0 flex-1">
-          <h1 className="break-words text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{repo?.full_name ?? 'Unknown'}</h1>
+        <div className="min-w-0 flex-1 basis-48">
+          <h1 className="break-words text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-50">{repo?.full_name ?? 'Unknown'}</h1>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{changelogs.length} changelogs</p>
         </div>
-        <button
-          onClick={() => { setRangeOpen((v) => !v); setRangeError('') }}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-        >
-          Range…
-        </button>
-        <button
-          onClick={generate}
-          disabled={generating}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
-        >
-          <Sparkles size={16} className={generating ? 'animate-pulse' : ''} />
-          {generating ? 'Queuing…' : 'Generate Now'}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => { setRangeOpen((v) => !v); setRangeError('') }}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 sm:px-4 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Range…
+          </button>
+          <button
+            onClick={generate}
+            disabled={generating}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50 sm:px-4"
+          >
+            <Sparkles size={16} className={generating ? 'animate-pulse' : ''} />
+            {generating ? 'Queuing…' : 'Generate Now'}
+          </button>
+        </div>
       </div>
 
       {repo && (

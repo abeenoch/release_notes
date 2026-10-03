@@ -98,7 +98,7 @@ export function ReposPage() {
       ) : (
         <div className="space-y-2">
           {repos.map((repo) => (
-            <div key={repo.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <div key={repo.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3.5 sm:px-5 sm:py-4 dark:border-zinc-800 dark:bg-zinc-900">
               <Link to={`/repos/${repo.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                   <GitBranch size={16} />
