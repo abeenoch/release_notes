@@ -56,10 +56,10 @@ export function PublicChangelogPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-5">
+      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95" style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}>
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-5">
           <div className="min-w-0">
-            <h1 className="break-words text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+            <h1 className="text-base font-semibold break-words text-zinc-900 sm:text-xl dark:text-zinc-50">
               {page.full_name}
             </h1>
             <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
@@ -69,17 +69,17 @@ export function PublicChangelogPage() {
           </div>
           <Link
             to="/"
-            className="shrink-0 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            className="shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
           >
             Release Notes
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
+      <main className="mx-auto w-full max-w-3xl space-y-4 px-3 py-5 sm:space-y-6 sm:px-4 sm:py-8">
         <SubscribeCard owner={owner ?? ''} repo={repo ?? ''} />
         {page.changelogs.length === 0 ? (
-          <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center sm:p-12 dark:border-zinc-800 dark:bg-zinc-900">
             <FileText size={36} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
             <p className="text-sm text-zinc-500 dark:text-zinc-400">No releases published yet.</p>
           </div>
@@ -87,19 +87,21 @@ export function PublicChangelogPage() {
           page.changelogs.map((c) => (
             <article
               key={`${c.version ?? 'v'}-${c.created_at}`}
-              className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+              className="min-w-0 overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
+                <h2 className="min-w-0 text-base font-semibold break-words text-zinc-900 sm:text-lg dark:text-zinc-50">
                   {c.version || c.to_tag || 'Unversioned'}
                 </h2>
-                <RelativeDate date={c.created_at} />
+                <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                  <RelativeDate date={c.created_at} />
+                </span>
               </div>
               {c.summary && (
-                <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-300">{c.summary}</p>
+                <p className="mb-3 text-sm break-words text-zinc-600 sm:mb-4 dark:text-zinc-300">{c.summary}</p>
               )}
-              <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(c.raw_markdown || '') }} />
-              <div className="mt-4 flex items-center gap-4 border-t border-zinc-100 pt-3 text-xs text-zinc-400 dark:border-zinc-800">
+              <div className="markdown-body min-w-0" dangerouslySetInnerHTML={{ __html: renderMarkdown(c.raw_markdown || '') }} />
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-zinc-100 pt-3 text-xs text-zinc-400 sm:mt-4 dark:border-zinc-800">
                 {c.commit_count != null && <span>{c.commit_count} commits</span>}
                 {c.release_url && (
                   <a
